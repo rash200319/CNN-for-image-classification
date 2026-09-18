@@ -1,1 +1,4 @@
 archive (1)
+__pycache__/
+*.pyc
+
