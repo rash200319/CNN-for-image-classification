@@ -1,7 +1,49 @@
 # CNN for Image Classification — EN3150 Assignment 03
 
 Resource-constrained CNN for edge image classification, using the **EuroSAT** dataset
-(`archive (1)/EuroSAT` — RGB, 64×64 already, 10 land-use classes).
+(`archive/EuroSAT` — RGB, 64×64 already, 10 land-use classes, 27,000 images).
+
+## Status (updated 2026-09-23)
+
+- [x] Dataset path fixed in `src/config.py` (`archive/EuroSAT`) and verified —
+  27,000 images across the 10 classes load correctly via `ImageFolder`.
+- [x] **Model A trained & evaluated** (Adam, lr=1e-3, 20 epochs,
+  `outputs/final_a_adam/`): **90.3% test accuracy**, precision/recall/F1
+  macro ≈ 0.90. Confusion matrix shows the two hardest pairs are
+  Highway↔River and HerbaceousVegetation↔PermanentCrop (visually similar
+  classes at 64×64 RGB) — worth a mention in the Section 4 discussion.
+  Train/val loss diverge mildly after ~epoch 11 (see
+  `outputs/final_a_adam/loss_curve.png`) since Model A's FC1 layer alone is
+  95% of its 549,290 params and there's no dropout/BN to regularize it —
+  noted as a discussion point, not changed, since Model A is meant to be the
+  plain "standard CNN" baseline that Model B contrasts against.
+- [x] **Optimizer sweep done** (`outputs/sweep_a_{adam,sgd,sgdm}/`, 10 epochs
+  each, see `outputs/sweep_a_comparison.png`): Adam converges fastest early;
+  plain SGD (lr=1e-2) is slow and unstable; SGD+momentum (same lr=1e-2)
+  closes most of the gap to Adam, demonstrating momentum's effect on
+  convergence speed — Adam/lr=1e-3 was used for the final Model A run above.
+- [ ] **Model B** (depthwise-separable, already implemented in
+  `src/models/model_b.py`, 13,288 params — well under the 100k cap) —
+  **not yet trained**. Reuse the exact same commands as Model A, swapping
+  `--model b`:
+  ```powershell
+  python -m src.train --model b --optimizer adam --lr 1e-3 --epochs 20 --run-name final_b_adam
+  python -m src.evaluate --model b --checkpoint outputs/final_b_adam/best_model.pt
+  python -m src.plot_history --run-dir outputs/final_b_adam
+  ```
+  (Optimizer sweep for Model A already picked Adam/lr=1e-3 — no need to
+  re-run the 3-way sweep for Model B unless you want to double-check it also
+  holds for the lightweight architecture.)
+- [ ] Model A vs. Model B comparison table (params, disk KB, time/epoch, test
+  accuracy) — needs Model B's results first.
+- [ ] Section 5: fine-tune two pretrained lightweight SOTA models — not started.
+- [ ] Section 6: final trade-off discussion vs. SOTA — not started.
+- [ ] Report write-up — not started.
+
+Helper scripts added: `src/plot_history.py` (train/val loss + accuracy
+curves from `history.csv`, single-run or multi-run overlay). All run
+outputs land in `outputs/<run-name>/` (gitignored — checkpoints aren't
+committed).
 
 ## What we have to build
 
