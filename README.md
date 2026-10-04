@@ -1,81 +1,203 @@
-# CNN for Image Classification — EN3150 Assignment 03
+# Resource-Constrained CNN for Edge Image Classification
 
-Resource-constrained CNN for edge image classification, using the **EuroSAT** dataset
-(`archive (1)/EuroSAT` — RGB, 64×64 already, 10 land-use classes).
+This repository contains the implementation for the EN3150 Assignment 03
+resource-constrained image-classification task.
 
-## What we have to build
+## Current completion status
 
-### 1. Data pipeline
-- Load EuroSAT RGB images (already ≤64×64, so minimal/no downscaling needed).
-- Split **70% train / 15% validation / 15% test**.
-- Normalize pixel values; keep class balance in mind across the 10 classes
-  (AnnualCrop, Forest, HerbaceousVegetation, Highway, Industrial, Pasture,
-  PermanentCrop, Residential, River, SeaLake).
-- Log dataset details (size, classes, split counts) in the assignment's shared sheet.
+The custom CNN foundation is implemented and tested locally. The complete
+assignment report and all required experiments are not yet finished.
 
-### 2. Two custom CNN architectures (20 marks)
-Both follow the standard CNN pipeline from the lecture:
-`[Conv + ReLU] → Pooling → [Conv + ReLU] → Pooling → Flatten → FC → Softmax`
+| Area | Status |
+|---|---|
+| EuroSAT dataset and preprocessing | Complete |
+| 70/15/15 stratified data split | Complete |
+| Model A standard CNN | Complete |
+| Model B depthwise-separable CNN | Complete |
+| Model B parameter budget | Complete |
+| Model A Adam training | Partially complete |
+| Model B training | Outstanding |
+| SGD and SGD-with-Momentum comparison | Outstanding |
+| Test evaluation and confusion matrices | Outstanding |
+| Training/validation loss plots | Outstanding |
+| Two pretrained lightweight SOTA models | Outstanding |
+| Final written report and trade-off discussion | Outstanding |
 
-- **Model A — Standard CNN**
-  Interleaved `Conv2D` + `MaxPooling2D` layers (regular 3×3 convolutions,
-  `C_out × C_in × K × K` weights per layer — see lecture's parameter-count slides).
+## Dataset
 
-- **Model B — Lightweight CNN (Depthwise Separable Convolutions)**
-  Replace standard convs with **depthwise separable convolutions**
-  (depthwise `F×F` conv per channel, `F²·K·H·W` ops, followed by a `1×1`
-  pointwise conv to mix channels, `K²·H·W` ops) — this is the MobileNets trick
-  from the lecture, giving roughly an 8–9× reduction in multiply-accumulates
-  vs. a regular 3×3 conv.
-  **Hard constraint: total trainable parameters ≤ 100,000.**
+The project uses the RGB version of the EuroSAT dataset. It is stored locally
+under `archive (1)/EuroSAT/EuroSAT`.
 
-For both models:
-- Explicitly list kernel sizes, filter counts, FC units.
-- Compute total trainable parameters by hand/formula (not just `model.summary()`).
-- Justify activation function choice on hardware-efficiency grounds (e.g. ReLU
-  over sigmoid/tanh — no expensive exponentials, cheap to compute on
-  microcontrollers/edge devices).
+- Images: 27,000
+- Classes: 10
+- Image resolution: 64x64 pixels
+- Training split: 18,900 images
+- Validation split: 4,049 images
+- Test split: 4,051 images
+- Split method: stratified split with random seed 42
 
-### 3. Optimizer selection & tuning (15 marks)
-- Pick an optimizer (e.g. Adam) + learning rate, justify the choice.
-- Compare against **plain SGD** and **SGD + Momentum**.
-- Explain how the momentum term affects convergence speed/stability.
+The small rounding difference in the split counts is due to integer sample
+allocation. Images are resized to 64x64 by the data pipeline.
 
-### 4. Training & evaluation of Model A / Model B (25 marks)
-- Train both ≥20 epochs; plot training vs. validation loss curves.
-- Test-set metrics: accuracy, confusion matrix, precision, recall.
-- Comparison table: parameter count, disk size (KB), time/epoch, test accuracy.
-- Discuss the standard-conv vs. depthwise-separable trade-offs (accuracy vs.
-  compute/size).
+Classes:
 
-### 5. Fine-tune two pretrained lightweight SOTA models (20 marks)
-Choose two of: MobileNetV1/V2, SqueezeNet, EfficientNet-B0, ShuffleNet.
-- Fine-tune on the *same* data splits (transfer learning: freeze backbone or
-  fine-tune, replace/train the final classification layer — see lecture's
-  "Strategy 1: feature extractor" vs. "Strategy 2: transfer learning" slides).
-- Report test accuracy, precision, recall, total params, model size (MB).
+1. AnnualCrop
+2. Forest
+3. HerbaceousVegetation
+4. Highway
+5. Industrial
+6. Pasture
+7. PermanentCrop
+8. Residential
+9. River
+10. SeaLake
 
-### 6. Final comparison & trade-off discussion (20 marks)
-Compare custom Model B vs. the two fine-tuned SOTA models — accuracy vs.
-memory footprint vs. computational cost trade-offs for edge deployment.
+## Project structure
 
-## Key CNN concepts to apply (from lecture slides)
-- Convolution arithmetic: output size `W − K + 1 + 2P`; `P = (K−1)/2` keeps
-  spatial size unchanged.
-- Multiply count for a regular conv layer: `C_out × C_in × K² × H × W`.
-- 1×1 convolutions for channel mixing / dimension reduction (bottleneck idea).
-- Depthwise separable convolution = depthwise conv (`F²·K·H·W`) + pointwise
-  1×1 conv (`K²·H·W`) — far cheaper than a full 3D conv (`F²·K²·H·W`).
-- Max pooling for downsampling + translation robustness.
-- Receptive field grows with depth/stride; deeper stacks of small kernels
-  approximate large receptive fields cheaply.
+```text
+src/
+  config.py                  Dataset and training configuration
+  data/dataset.py            Dataset loading, augmentation, and splitting
+  models/model_a.py          Standard convolutional CNN
+  models/model_b.py          Lightweight depthwise-separable CNN
+  models/blocks.py           Reusable depthwise-separable block
+  train.py                   Training entry point
+  evaluate.py                Test metrics and confusion-matrix generation
+  utils.py                   Shared utilities
+outputs/
+  modela_adam/              Existing Model A training artifacts
+```
 
-## Deliverables / submission checklist
-- [ ] Report + code uploaded **separately** to Moodle as `Yourgroupno_A03_EN3150`.
-- [ ] Code complete, commented, runnable.
-- [ ] Group members' names + index numbers in the report.
-- [ ] GitHub repo with regular commits (link included in report).
-- [ ] Interpretation/discussion sections are as important as the numbers.
+## Custom CNNs
 
-Reference: `EN3150_Assignment_03_In23.pdf` (assignment spec) and
-`../EN3150 Pattern Recognition_L07.pdf` (CNN lecture slides).
+### Model A: Standard CNN
+
+Model A uses regular 2D convolutions:
+
+```text
+Input: 3 x 64 x 64
+Conv2D(3 -> 16, 3x3) -> ReLU -> MaxPool(2x2)
+Conv2D(16 -> 32, 3x3) -> ReLU -> MaxPool(2x2)
+Conv2D(32 -> 64, 3x3) -> ReLU -> MaxPool(2x2)
+Flatten
+Linear(64*8*8 -> 128) -> ReLU
+Linear(128 -> 10)
+```
+
+Verified trainable parameter count: **549,290**.
+
+### Model B: Lightweight CNN
+
+Model B replaces regular convolutions with depthwise-separable convolutions
+and uses global average pooling:
+
+```text
+Input: 3 x 64 x 64
+DepthwiseSeparableConv(3 -> 32, 3x3) -> MaxPool(2x2)
+DepthwiseSeparableConv(32 -> 64, 3x3) -> MaxPool(2x2)
+DepthwiseSeparableConv(64 -> 128, 3x3) -> MaxPool(2x2)
+Adaptive Global Average Pooling
+Linear(128 -> 10)
+```
+
+Verified trainable parameter count: **13,288**.
+
+This is below the assignment limit of 100,000 trainable parameters. ReLU is
+used because it is inexpensive on edge hardware and avoids the exponential
+operations required by sigmoid or tanh.
+
+## Existing training evidence
+
+Model A has been trained with Adam for 20 epochs:
+
+- Run directory: `outputs/modela_adam`
+- History: `outputs/modela_adam/history.csv`
+- Checkpoint: `outputs/modela_adam/best_model.pt`
+- Final training accuracy: **91.99%**
+- Best recorded validation accuracy: **88.84%**
+- Approximate checkpoint size: **2,150.1 KB**
+- Approximate average epoch time: **48 seconds**
+
+The recorded accuracy is validation accuracy, not final test accuracy.
+Therefore, it must not be presented as the assignment's final test result.
+
+Approximate FP32 parameter storage calculated from the verified parameter
+counts:
+
+| Model | Trainable parameters | Approximate FP32 size |
+|---|---:|---:|
+| Model A | 549,290 | 2,145.7 KB |
+| Model B | 13,288 | 51.9 KB |
+
+The actual checkpoint size can differ because checkpoints may also contain
+metadata or serialization overhead.
+
+## How to run
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Run Model A with Adam:
+
+```bash
+python -m src.train --model a --optimizer adam --lr 1e-3 --epochs 20
+```
+
+Run Model B with Adam:
+
+```bash
+python -m src.train --model b --optimizer adam --lr 1e-3 --epochs 20
+```
+
+Run plain SGD:
+
+```bash
+python -m src.train --model b --optimizer sgd --lr 1e-2 --epochs 20
+```
+
+Run SGD with Momentum:
+
+```bash
+python -m src.train --model b --optimizer sgd_momentum --lr 1e-2 --momentum 0.9 --epochs 20
+```
+
+Evaluate a trained checkpoint:
+
+```bash
+python -m src.evaluate --model b --checkpoint outputs/modelb_adam/best_model.pt
+```
+
+Evaluation writes `metrics.json` and `confusion_matrix.png` into the
+checkpoint's output directory.
+
+## Work remaining before submission
+
+The following tasks still need to be completed:
+
+1. Train Model B for at least 20 epochs.
+2. Run and record Adam, SGD, and SGD-with-Momentum comparisons.
+3. Evaluate both custom models on the held-out test set.
+4. Generate loss curves, confusion matrices, precision, recall, and accuracy.
+5. Create the custom-model comparison table covering parameters, model size,
+   time per epoch, and test accuracy.
+6. Implement and fine-tune two lightweight pretrained networks, such as
+   MobileNetV2 and SqueezeNet.
+7. Record SOTA accuracy, precision, recall, parameter count, model size, and
+   training time.
+8. Write the final accuracy-versus-memory-versus-computation discussion.
+9. Add group-member names, index numbers, and the final submission report.
+
+## Important notes
+
+- The dataset split is generated deterministically using seed 42.
+- Model B's parameter budget is enforced with an assertion in the model
+  constructor.
+- Existing output files are currently generated artifacts and should be
+  intentionally included in version control if they are required for
+  submission.
+- No pretrained SOTA model implementation or final report is currently
+  included.
+
