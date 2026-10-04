@@ -15,10 +15,10 @@ assignment report and all required experiments are not yet finished.
 | Model A standard CNN | Complete |
 | Model B depthwise-separable CNN | Complete |
 | Model B parameter budget | Complete |
-| Model A Adam training | Partially complete |
-| Model B training | Outstanding |
-| SGD and SGD-with-Momentum comparison | Outstanding |
-| Test evaluation and confusion matrices | Outstanding |
+| Model A Adam training | Complete |
+| Model B Adam training | Complete |
+| SGD and SGD-with-Momentum comparison | Complete for Model B |
+| Test evaluation and confusion matrices | Complete for completed runs |
 | Training/validation loss plots | Outstanding |
 | Two pretrained lightweight SOTA models | Outstanding |
 | Final written report and trade-off discussion | Outstanding |
@@ -118,8 +118,36 @@ Model A has been trained with Adam for 20 epochs:
 - Approximate checkpoint size: **2,150.1 KB**
 - Approximate average epoch time: **48 seconds**
 
-The recorded accuracy is validation accuracy, not final test accuracy.
-Therefore, it must not be presented as the assignment's final test result.
+The final test evaluation for this checkpoint is:
+
+- Test accuracy: **89.66%**
+- Macro precision: **0.9021**
+- Macro recall: **0.8920**
+
+The validation accuracy and test accuracy are reported separately.
+
+Model B has now been trained for 20 epochs with Adam, plain SGD, and SGD with
+momentum. The resulting test metrics are:
+
+| Run | Test accuracy | Macro precision | Macro recall | Average epoch time |
+|---|---:|---:|---:|---:|
+| Model B + Adam | **89.76%** | 0.8948 | 0.8963 | 92.08 s |
+| Model B + SGD | 82.35% | 0.8163 | 0.8161 | 87.64 s |
+| Model B + SGD + momentum (0.9) | 89.41% | 0.8924 | 0.8913 | 87.63 s |
+
+The Adam and momentum runs substantially outperformed plain SGD under these
+learning-rate settings. Momentum improved SGD convergence by carrying a
+velocity term from previous updates, reducing oscillation and helping the
+optimizer move through shallow or noisy regions of the loss surface. In this
+experiment, momentum reached a much stronger result than plain SGD and was
+close to Adam.
+
+Generated artifacts are stored in:
+
+- `outputs/modela_adam/`
+- `outputs/modelb_adam/`
+- `outputs/modelb_sgd/`
+- `outputs/modelb_sgd_momentum/`
 
 Approximate FP32 parameter storage calculated from the verified parameter
 counts:
@@ -131,6 +159,19 @@ counts:
 
 The actual checkpoint size can differ because checkpoints may also contain
 metadata or serialization overhead.
+
+Custom-model Adam comparison:
+
+| Model | Parameters | Checkpoint size | Average epoch time | Test accuracy |
+|---|---:|---:|---:|---:|
+| Model A + Adam | 549,290 | 2,150.1 KB | 49.65 s | 89.66% |
+| Model B + Adam | 13,288 | 63.4 KB | 92.08 s | 89.76% |
+
+Model B uses approximately 97.6% fewer trainable parameters than Model A and
+achieved a very similar test accuracy in this experiment. Its CPU epoch time
+was higher in these runs, so parameter count and serialized size should not be
+treated as a direct measurement of wall-clock speed. Actual deployment cost
+also depends on the hardware kernel implementation and memory bandwidth.
 
 ## How to run
 
@@ -177,18 +218,17 @@ checkpoint's output directory.
 
 The following tasks still need to be completed:
 
-1. Train Model B for at least 20 epochs.
-2. Run and record Adam, SGD, and SGD-with-Momentum comparisons.
-3. Evaluate both custom models on the held-out test set.
-4. Generate loss curves, confusion matrices, precision, recall, and accuracy.
-5. Create the custom-model comparison table covering parameters, model size,
+1. Generate training/validation loss plots from the four saved history CSV files.
+2. Run the optional Model A SGD and Model A SGD-with-Momentum experiments if
+   a comparison for both custom architectures is required.
+3. Create the custom-model comparison table covering parameters, model size,
    time per epoch, and test accuracy.
-6. Implement and fine-tune two lightweight pretrained networks, such as
+4. Implement and fine-tune two lightweight pretrained networks, such as
    MobileNetV2 and SqueezeNet.
-7. Record SOTA accuracy, precision, recall, parameter count, model size, and
+5. Record SOTA accuracy, precision, recall, parameter count, model size, and
    training time.
-8. Write the final accuracy-versus-memory-versus-computation discussion.
-9. Add group-member names, index numbers, and the final submission report.
+6. Write the final accuracy-versus-memory-versus-computation discussion.
+7. Add group-member names, index numbers, and the final submission report.
 
 ## Important notes
 
@@ -200,4 +240,3 @@ The following tasks still need to be completed:
   submission.
 - No pretrained SOTA model implementation or final report is currently
   included.
-
