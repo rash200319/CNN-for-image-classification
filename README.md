@@ -19,14 +19,15 @@ assignment report and all required experiments are not yet finished.
 | Model B Adam training | Complete |
 | SGD and SGD-with-Momentum comparison | Complete for Model B |
 | Test evaluation and confusion matrices | Complete for completed runs |
-| Training/validation loss plots | Outstanding |
-| Two pretrained lightweight SOTA models | Outstanding |
+| Training/validation loss plots | Complete |
+| Two pretrained lightweight SOTA models | Complete |
+| Custom-model vs. SOTA comparison table | Outstanding |
 | Final written report and trade-off discussion | Outstanding |
 
 ## Dataset
 
 The project uses the RGB version of the EuroSAT dataset. It is stored locally
-under `archive (1)/EuroSAT/EuroSAT`.
+under `archive/EuroSAT`.
 
 - Images: 27,000
 - Classes: 10
@@ -173,6 +174,51 @@ was higher in these runs, so parameter count and serialized size should not be
 treated as a direct measurement of wall-clock speed. Actual deployment cost
 also depends on the hardware kernel implementation and memory bandwidth.
 
+## SOTA fine-tuning (MobileNetV2 and EfficientNet-B0)
+
+Two ImageNet-pretrained lightweight models were fine-tuned end-to-end on the
+same EuroSAT splits, for 5 epochs each with Adam (lr=1e-4). Pretrained models
+need a larger input than the 64x64 used for Model A/B, so `src/train.py` and
+`src/evaluate.py` accept an `--img-size` flag; ImageNet normalization
+statistics are used automatically for these two models (see
+`src/models/pretrained.py`).
+
+| Model | Input size | Parameters | Checkpoint size | Test accuracy | Macro precision | Macro recall |
+|---|---:|---:|---:|---:|---:|---:|
+| MobileNetV2 | 128x128 | 2,236,682 | 8,972.6 KB | **98.32%** | 0.9826 | 0.9823 |
+| EfficientNet-B0 | 64x64 | 4,020,358 | 15,992.1 KB | **97.70%** | 0.9764 | 0.9761 |
+
+Both comfortably beat the from-scratch custom models (Model A: 89.66-90.27%,
+Model B: 82.35-89.76%, depending on run/optimizer) after only 5 epochs, as
+expected for transfer learning from ImageNet features. The same confusion
+pairs seen in Model A (Highway/River, HerbaceousVegetation/PermanentCrop,
+AnnualCrop/PermanentCrop) still show up in the confusion matrices here, just
+far smaller in magnitude, suggesting they're genuinely hard classes in this
+dataset rather than a weakness specific to the custom models.
+
+Per-epoch timing on this CPU-only machine was inconsistent (occasional
+epochs ran 3-5x longer than the rest, likely due to background system load),
+so epoch-time figures for these two runs should be treated as approximate
+and not used directly in the time/epoch comparison column.
+
+Generated artifacts:
+
+- `outputs/final_mobilenet_v2/` (checkpoint, history, confusion matrix, loss
+  curve, metrics.json)
+- `outputs/final_efficientnet_b0/` (same)
+
+To reproduce:
+
+```bash
+python -m src.train --model mobilenet_v2 --optimizer adam --lr 1e-4 --img-size 128 --epochs 5 --run-name final_mobilenet_v2
+python -m src.evaluate --model mobilenet_v2 --checkpoint outputs/final_mobilenet_v2/best_model.pt --img-size 128
+python -m src.plot_history --run-dir outputs/final_mobilenet_v2
+
+python -m src.train --model efficientnet_b0 --optimizer adam --lr 1e-4 --img-size 64 --epochs 5 --run-name final_efficientnet_b0
+python -m src.evaluate --model efficientnet_b0 --checkpoint outputs/final_efficientnet_b0/best_model.pt --img-size 64
+python -m src.plot_history --run-dir outputs/final_efficientnet_b0
+```
+
 ## How to run
 
 Install dependencies:
@@ -218,17 +264,17 @@ checkpoint's output directory.
 
 The following tasks still need to be completed:
 
-1. Generate training/validation loss plots from the four saved history CSV files.
+1. Reconcile the two separate Model A Adam runs (`outputs/modela_adam` at
+   89.66% test accuracy vs. `outputs/final_a_adam` at 90.27%) so the report
+   cites one canonical Model A result.
 2. Run the optional Model A SGD and Model A SGD-with-Momentum experiments if
    a comparison for both custom architectures is required.
-3. Create the custom-model comparison table covering parameters, model size,
-   time per epoch, and test accuracy.
-4. Implement and fine-tune two lightweight pretrained networks, such as
-   MobileNetV2 and SqueezeNet.
-5. Record SOTA accuracy, precision, recall, parameter count, model size, and
-   training time.
-6. Write the final accuracy-versus-memory-versus-computation discussion.
-7. Add group-member names, index numbers, and the final submission report.
+3. Create the full comparison table covering parameters, model size, time
+   per epoch, and test accuracy across Model A, Model B, and the two SOTA
+   fine-tuned models.
+4. Write the final accuracy-versus-memory-versus-computation discussion
+   comparing Model B against the two fine-tuned SOTA models.
+5. Add group-member names, index numbers, and the final submission report.
 
 ## Important notes
 
