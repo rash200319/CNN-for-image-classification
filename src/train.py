@@ -20,9 +20,11 @@ import torch
 import torch.nn as nn
 from tqdm import tqdm
 
+from src.config import IMAGE_SIZE
 from src.data.dataset import get_dataloaders
 from src.models.model_a import ModelA
 from src.models.model_b import ModelB
+from src.models.pretrained import IMAGENET_MEAN, IMAGENET_STD, PRETRAINED_MODELS, build_pretrained
 from src.utils import count_parameters
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "outputs"
@@ -33,7 +35,15 @@ def build_model(name: str, num_classes: int) -> nn.Module:
         return ModelA(num_classes=num_classes)
     if name == "b":
         return ModelB(num_classes=num_classes)
+    if name in PRETRAINED_MODELS:
+        return build_pretrained(name, num_classes=num_classes)
     raise ValueError(f"Unknown model: {name}")
+
+
+def normalization_for(name: str):
+    if name in PRETRAINED_MODELS:
+        return IMAGENET_MEAN, IMAGENET_STD
+    return (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
 
 
 def build_optimizer(name: str, params, lr: float, momentum: float) -> torch.optim.Optimizer:
@@ -76,11 +86,12 @@ def run_epoch(model, loader, criterion, device, optimizer=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", choices=["a", "b"], required=True)
+    parser.add_argument("--model", choices=["a", "b", *PRETRAINED_MODELS], required=True)
     parser.add_argument("--optimizer", choices=["adam", "sgd", "sgd_momentum"], required=True)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--img-size", type=int, default=IMAGE_SIZE)
     parser.add_argument("--run-name", type=str, default=None)
     args = parser.parse_args()
 
@@ -89,7 +100,10 @@ def main():
     run_dir = OUTPUT_DIR / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    train_loader, val_loader, _, classes = get_dataloaders()
+    mean, std = normalization_for(args.model)
+    train_loader, val_loader, _, classes = get_dataloaders(
+        image_size=args.img_size, mean=mean, std=std
+    )
     model = build_model(args.model, num_classes=len(classes)).to(device)
     print(f"{run_name}: {count_parameters(model):,} trainable params on {device}")
 

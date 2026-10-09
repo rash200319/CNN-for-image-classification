@@ -7,23 +7,25 @@ from src.config import BATCH_SIZE, DATA_DIR, IMAGE_SIZE, SEED, TEST_SPLIT, TRAIN
 NORM_MEAN = (0.5, 0.5, 0.5)
 NORM_STD = (0.5, 0.5, 0.5)
 
-TRAIN_TRANSFORM = transforms.Compose(
-    [
-        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomVerticalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize(NORM_MEAN, NORM_STD),
-    ]
-)
 
-EVAL_TRANSFORM = transforms.Compose(
-    [
-        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-        transforms.ToTensor(),
-        transforms.Normalize(NORM_MEAN, NORM_STD),
-    ]
-)
+def build_transforms(image_size: int, mean, std):
+    train = transforms.Compose(
+        [
+            transforms.Resize((image_size, image_size)),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomVerticalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std),
+        ]
+    )
+    evaluate = transforms.Compose(
+        [
+            transforms.Resize((image_size, image_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std),
+        ]
+    )
+    return train, evaluate
 
 
 def _stratified_split(targets):
@@ -44,9 +46,11 @@ def _stratified_split(targets):
     return train_idx, val_idx, test_idx
 
 
-def get_dataloaders(batch_size: int = BATCH_SIZE, num_workers: int = 2):
-    train_base = datasets.ImageFolder(DATA_DIR, transform=TRAIN_TRANSFORM)
-    eval_base = datasets.ImageFolder(DATA_DIR, transform=EVAL_TRANSFORM)
+def get_dataloaders(batch_size: int = BATCH_SIZE, num_workers: int = 2,
+                    image_size: int = IMAGE_SIZE, mean=NORM_MEAN, std=NORM_STD):
+    train_transform, eval_transform = build_transforms(image_size, mean, std)
+    train_base = datasets.ImageFolder(DATA_DIR, transform=train_transform)
+    eval_base = datasets.ImageFolder(DATA_DIR, transform=eval_transform)
 
     train_idx, val_idx, test_idx = _stratified_split(train_base.targets)
 
