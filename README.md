@@ -260,29 +260,39 @@ python -m src.evaluate --model b --checkpoint outputs/modelb_adam/best_model.pt
 Evaluation writes `metrics.json` and `confusion_matrix.png` into the
 checkpoint's output directory.
 
+## Cloud Execution (Kaggle / Colab)
+
+A self-contained notebook is available at `notebooks/EN3150_A03_kaggle_colab.ipynb` to run all experiments (Model A, Model B with 3 optimizers, MobileNetV2, EfficientNet-B0, evaluation, plots, and comparison tables) under a single GPU for consistent benchmark timings.
+
+### Running on Kaggle:
+1. Open Kaggle -> **Create -> New Notebook -> File -> Import Notebook** and select `notebooks/EN3150_A03_kaggle_colab.ipynb`.
+2. In the right panel (**Session options**):
+   - **Accelerator**: Set to **GPU T4 x2** (or P100).
+   - **Internet**: Toggle **On** (requires phone verification on Kaggle).
+3. Click **Run All** (or **Save Version -> Save & Run All (Commit)** to execute headlessly in the background).
+4. After completion, download `results.zip` from the notebook's **Output** tab and extract into `outputs/`.
+
 ## Work remaining before submission
 
 The following tasks still need to be completed:
 
-1. Reconcile the two separate Model A Adam runs (`outputs/modela_adam` at
-   89.66% test accuracy vs. `outputs/final_a_adam` at 90.27%) so the report
-   cites one canonical Model A result.
-2. Run the optional Model A SGD and Model A SGD-with-Momentum experiments if
-   a comparison for both custom architectures is required.
-3. Create the full comparison table covering parameters, model size, time
-   per epoch, and test accuracy across Model A, Model B, and the two SOTA
-   fine-tuned models.
-4. Write the final accuracy-versus-memory-versus-computation discussion
-   comparing Model B against the two fine-tuned SOTA models.
-5. Add group-member names, index numbers, and the final submission report.
+1. **Re-run / Reconcile benchmarks on unified hardware**:
+   - Run all models under the same GPU (e.g., via the Kaggle notebook) so that "Time per epoch" in the comparison table is fair and consistent across architectures.
+   - Reconcile Model A Adam test accuracy (89.66% vs 90.27%) so the report references canonical outputs.
+2. **Include outputs & artifacts**:
+   - Ensure final checkpoints and metrics for SOTA models (`final_mobilenet_v2`, `final_efficientnet_b0`) are saved and present in `outputs/`.
+3. **Report updates (`report/main.tex`)**:
+   - Update tables and numbers with the finalized metrics.
+   - SOTA sizes should explicitly include **MB** values in addition to KB as requested in the assignment PDF.
+   - Fill in group member names, index numbers, and the GitHub repository link (lines 21–23).
+   - Confirm that the dataset information sheet referenced in the assignment brief has been filled in, and remove the `\todofill` note.
+   - Review and customize the discussion and trade-off write-up in your own words.
+4. **Final Submission**:
+   - Compile `report/main.tex` to PDF.
+   - Package code and report separately according to course guidelines (`GroupNo_A03_EN3150`).
 
 ## Important notes
 
 - The dataset split is generated deterministically using seed 42.
-- Model B's parameter budget is enforced with an assertion in the model
-  constructor.
-- Existing output files are currently generated artifacts and should be
-  intentionally included in version control if they are required for
-  submission.
-- No pretrained SOTA model implementation or final report is currently
-  included.
+- Model B's parameter budget (<= 100,000 parameters) is strictly enforced with an assertion in the model constructor.
+- Regular Git commits are required by the module instructors to demonstrate project progress over time.
