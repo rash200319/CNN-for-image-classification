@@ -59,14 +59,25 @@ Classes:
 src/
   config.py                  Dataset and training configuration
   data/dataset.py            Dataset loading, augmentation, and splitting
-  models/model_a.py          Standard convolutional CNN
-  models/model_b.py          Lightweight depthwise-separable CNN
-  models/blocks.py           Reusable depthwise-separable block
+  models/model_a.py          Standard convolutional CNN (549k params)
+  models/model_b.py          Lightweight depthwise-separable CNN (13k params)
+  models/blocks.py           Reusable depthwise-separable conv block
+  models/pretrained.py       ImageNet backbones (MobileNetV2, EfficientNet-B0)
   train.py                   Training entry point
   evaluate.py                Test metrics and confusion-matrix generation
-  utils.py                   Shared utilities
-outputs/
-  modela_adam/              Existing Model A training artifacts
+  benchmark.py               Hardware latency, peak memory, and MAC/FLOP profiler
+  predict.py                 Single-image and batch land-use inference CLI
+  plot_history.py            Training/validation curve generator
+  compare_runs.py            Comparison table aggregator across runs
+  utils.py                   Shared parameter counting and helper utilities
+tests/
+  test_models.py             Architecture budget and tensor shape assertions
+  test_benchmark.py          MAC/FLOP calculation assertions
+  test_predict.py            Inference pipeline validation
+notebooks/
+  EN3150_A03_kaggle_colab.ipynb  Executed end-to-end cloud GPU training run
+outputs/                     Saved checkpoints, metrics.json, and plots
+report/                      LaTeX source (main.tex) and figures
 ```
 
 ## Custom CNNs
@@ -260,6 +271,34 @@ python -m src.evaluate --model b --checkpoint outputs/modelb_adam/best_model.pt
 Evaluation writes `metrics.json` and `confusion_matrix.png` into the
 checkpoint's output directory.
 
+### Hardware Profiling & MAC/FLOP Benchmarking:
+
+Profile theoretical Multiply-Accumulate operations (MACs), FLOPs, single-image latency (ms), and throughput across all architectures:
+
+```bash
+# Benchmark on CPU
+python -m src.benchmark --device cpu --runs 100
+
+# Benchmark on GPU (if available)
+python -m src.benchmark --device cuda --runs 100 --batch-size 1
+```
+
+### Single-Image Inference CLI:
+
+Classify any satellite image with top-K class confidences and visual bars:
+
+```bash
+python -m src.predict --image path/to/sample.jpg --checkpoint outputs/modelb_adam/best_model.pt --model b --top-k 3
+```
+
+### Running Automated Unit Tests:
+
+Run the test suite verifying Model B's $\le 100,000$ parameter budget, output tensor shapes, MAC calculations, and the inference pipeline:
+
+```bash
+python -m unittest discover tests
+```
+
 ## Cloud Execution (Kaggle / Colab)
 
 A self-contained notebook is available at `notebooks/EN3150_A03_kaggle_colab.ipynb` to run all experiments (Model A, Model B with 3 optimizers, MobileNetV2, EfficientNet-B0, evaluation, plots, and comparison tables) under a single GPU for consistent benchmark timings.
@@ -274,22 +313,17 @@ A self-contained notebook is available at `notebooks/EN3150_A03_kaggle_colab.ipy
 
 ## Work remaining before submission
 
-The following tasks still need to be completed:
+The following tasks are completed and remaining:
 
-1. **Re-run / Reconcile benchmarks on unified hardware**:
-   - Run all models under the same GPU (e.g., via the Kaggle notebook) so that "Time per epoch" in the comparison table is fair and consistent across architectures.
-   - Reconcile Model A Adam test accuracy (89.66% vs 90.27%) so the report references canonical outputs.
-2. **Include outputs & artifacts**:
-   - Ensure final checkpoints and metrics for SOTA models (`final_mobilenet_v2`, `final_efficientnet_b0`) are saved and present in `outputs/`.
-3. **Report updates (`report/main.tex`)**:
-   - Update tables and numbers with the finalized metrics.
-   - SOTA sizes should explicitly include **MB** values in addition to KB as requested in the assignment PDF.
-   - Fill in group member names, index numbers, and the GitHub repository link (lines 21–23).
-   - Confirm that the dataset information sheet referenced in the assignment brief has been filled in, and remove the `\todofill` note.
-   - Review and customize the discussion and trade-off write-up in your own words.
-4. **Final Submission**:
-   - Compile `report/main.tex` to PDF.
-   - Package code and report separately according to course guidelines (`GroupNo_A03_EN3150`).
+- [x] **Re-run benchmarks on unified hardware**: Completed on Tesla T4 GPU.
+- [x] **Include outputs & artifacts**: Checkpoints, loss curves, confusion matrices, and metrics present in `outputs/`.
+- [x] **Report tables & figures update**: `report/main.tex` updated with Tesla T4 metrics and plots.
+- [x] **Hardware profiling & CLI tools**: Added `src/benchmark.py`, `src/predict.py`, and test suite.
+- [ ] **Author Details (`report/main.tex`)**: Fill in group member names, index numbers, and university emails (lines 21–22).
+- [ ] **Dataset Sheet**: Confirm that the dataset information sheet referenced in the assignment brief has been filled in, and remove the `\todofill` note on line 64.
+- [ ] **Final Submission**:
+  - Compile `report/main.tex` to PDF (e.g. via Overleaf).
+  - Package code and report separately according to course guidelines (`GroupNo_A03_EN3150`).
 
 ## Important notes
 
