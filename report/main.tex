@@ -20,7 +20,7 @@
 \author{
   \todofill{Student Name 1} (\todofill{Index Number 1}) \\
   \todofill{Student Name 2} (\todofill{Index Number 2}) \\[0.5em]
-  GitHub repository: \todofill{https://github.com/your-org/CNN-for-image-classification}
+  GitHub repository: \url{https://github.com/rash200319/CNN-for-image-classification}
 }
 \date{\today}
 
@@ -283,9 +283,9 @@ evaluated) under all three optimizer settings.
 \toprule
 Optimizer & Test accuracy & Macro precision & Macro recall \\
 \midrule
-Adam & \textbf{89.76\%} & 0.8948 & 0.8963 \\
-SGD & 82.35\% & 0.8163 & 0.8161 \\
-SGD + Momentum (0.9) & 89.41\% & 0.8924 & 0.8913 \\
+Adam & \textbf{89.61\%} & 0.8975 & 0.8918 \\
+SGD & 81.26\% & 0.8095 & 0.8042 \\
+SGD + Momentum (0.9) & 87.71\% & 0.8822 & 0.8723 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -293,17 +293,17 @@ SGD + Momentum (0.9) & 89.41\% & 0.8924 & 0.8913 \\
 \paragraph{Discussion: effect of momentum.} In both experiments, plain SGD
 is clearly the weakest optimizer -- its validation loss is both higher and
 visibly less stable (Figure~\ref{fig:model-a-sweep} shows a sharp spike
-around epoch 5), and on Model B it is nearly 7.5 percentage points behind
-Adam in test accuracy. Adding momentum (velocity term $v_{t} = \mu v_{t-1} +
+around epoch 5), and on Model B it is roughly 8.35 percentage points behind
+Adam in test accuracy ($81.26\%$ vs.\ $89.61\%$). Adding momentum (velocity term $v_{t} = \mu v_{t-1} +
 \nabla_\theta \mathcal{L}$, with the parameter update using $v_t$ instead of
 the raw gradient) at the \emph{same} learning rate dramatically changes this
 picture: the momentum term accumulates an exponentially-weighted average of
 past gradients, which (i) damps oscillation in directions where the gradient
 sign repeatedly flips, and (ii) effectively increases the step size in
 directions where the gradient is consistently pointing the same way. This is
-exactly what is observed here -- SGD with momentum converges almost as fast
-as Adam and reaches a nearly identical final accuracy (within $0.35$
-percentage points on Model B, and ahead of Adam on the Model A sweep by
+exactly what is observed here -- SGD with momentum converges significantly faster
+than plain SGD and closes most of the accuracy gap, reaching $87.71\%$ test accuracy
+(within $1.9$ percentage points on Model B, and ahead of Adam on the Model A sweep by
 epoch 10), despite using a much simpler update rule. This confirms that most
 of the practical convergence benefit over plain SGD in this setting comes
 from momentum specifically, rather than from Adam's additional per-parameter
@@ -369,18 +369,18 @@ simply has far fewer parameters available to overfit with.
  & \multicolumn{2}{c}{Model A} & \multicolumn{2}{c}{Model B} \\
 Class & Precision & Recall & Precision & Recall \\
 \midrule
-AnnualCrop            & 0.900 & 0.882 & 0.956 & 0.824 \\
-Forest                & 0.947 & 0.962 & 0.955 & 0.987 \\
-HerbaceousVegetation  & 0.900 & 0.840 & 0.924 & 0.840 \\
-Highway               & 0.892 & 0.789 & 0.856 & 0.760 \\
-Industrial            & 0.897 & 0.971 & 0.919 & 0.909 \\
-Pasture               & 0.866 & 0.930 & 0.849 & 0.973 \\
-PermanentCrop         & 0.848 & 0.861 & 0.815 & 0.872 \\
-Residential           & 0.977 & 0.953 & 0.870 & 0.993 \\
-River                 & 0.796 & 0.904 & 0.839 & 0.819 \\
-SeaLake               & 0.981 & 0.929 & 0.965 & 0.984 \\
+AnnualCrop            & 0.861 & 0.949 & 0.837 & 0.911 \\
+Forest                & 0.969 & 0.960 & 0.961 & 0.989 \\
+HerbaceousVegetation  & 0.858 & 0.900 & 0.881 & 0.900 \\
+Highway               & 0.846 & 0.851 & 0.755 & 0.880 \\
+Industrial            & 0.970 & 0.936 & 0.953 & 0.909 \\
+Pasture               & 0.887 & 0.947 & 0.870 & 0.960 \\
+PermanentCrop         & 0.884 & 0.816 & 0.879 & 0.776 \\
+Residential           & 0.976 & 0.976 & 0.925 & 0.991 \\
+River                 & 0.893 & 0.821 & 0.930 & 0.635 \\
+SeaLake               & 0.993 & 0.962 & 0.984 & 0.967 \\
 \midrule
-\textbf{Macro average} & \textbf{0.900} & \textbf{0.902} & \textbf{0.895} & \textbf{0.896} \\
+\textbf{Macro average} & \textbf{0.914} & \textbf{0.912} & \textbf{0.897} & \textbf{0.892} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -397,46 +397,38 @@ than a weakness specific to either architecture.
 
 \begin{table}[H]
 \centering
-\caption{Model A vs. Model B comparison (20 epochs, Adam, $\text{lr}=10^{-3}$).}
+\caption{Model A vs. Model B comparison (20 epochs, Adam, $\text{lr}=10^{-3}$, Tesla T4 GPU).}
 \label{tab:ab-comparison}
 \begin{tabular}{lrrrr}
 \toprule
 Model & Parameters & Checkpoint size & Median time/epoch & Test accuracy \\
 \midrule
-Model A (standard CNN) & 549{,}290 & 2{,}150.1 KB & 72.6 s & 90.27\% \\
-Model B (depthwise-sep.) & 13{,}288 & 63.4 KB & 92.8 s & 89.76\% \\
+Model A (standard CNN) & 549{,}290 & 2{,}150.1 KB & 10.0 s & 91.46\% \\
+Model B (depthwise-sep.) & 13{,}288 & 63.9 KB & 10.3 s & 89.61\% \\
 \bottomrule
 \end{tabular}
 \end{table}
-\emph{Time/epoch is reported as the median across epochs rather than the
-mean, since a small number of epochs on this shared CPU-only machine were
-several times slower than the rest due to background system load; the
-median is robust to that kind of one-off outlier.}
+\emph{Time/epoch is reported as the median across epochs on a dedicated Tesla T4 GPU, providing an exact, head-to-head wall-clock comparison under identical cloud hardware.}
 
 \subsection{Discussion: standard vs. depthwise-separable trade-offs}
 
 Model B uses only $13{,}288 / 549{,}290 \approx 2.4\%$ of Model A's
 parameters and produces a checkpoint roughly $34\times$ smaller
-($63.4$~KB vs.\ $2{,}150.1$~KB), while losing only $0.51$ percentage points
-of test accuracy ($89.76\%$ vs.\ $90.27\%$). This is a strong result for the
-depthwise-separable design: at a fraction of the memory footprint, Model B
-achieves essentially the same classification quality on this task.
+($63.9$~KB vs.\ $2{,}150.1$~KB), while maintaining competitive accuracy,
+differing by only $1.85$ percentage points ($89.61\%$ vs.\ $91.46\%$). This is
+a strong result for the depthwise-separable design: at a tiny fraction of the
+memory footprint, Model B achieves essentially competitive classification quality
+on this task.
 
-One counter-intuitive result is that Model B's median epoch time
-($92.8$~s) is actually \emph{higher} than Model A's ($72.6$~s), despite
-having far fewer parameters and, in theory, fewer multiply-accumulate
-operations. This is a known practical caveat of depthwise-separable
-convolutions on general-purpose hardware: grouped/depthwise convolutions
-have a much lower arithmetic intensity (FLOPs per byte moved) than dense
-convolutions, so they are more memory-bandwidth-bound and benefit less from
-the vectorized/cache-friendly BLAS kernels that accelerate dense
-convolutions on a generic CPU. In practice, this gap is usually closed (or
-reversed) on inference runtimes and accelerators with kernels specifically
-optimized for depthwise-separable convolution (e.g.\ TFLite with XNNPACK, or
-dedicated mobile NPUs) -- the wall-clock disadvantage measured here is a
-property of this particular unoptimized CPU training environment, not of
-the operation itself, and should not be read as a general statement about
-depthwise-separable convolutions being slower in deployment.
+When comparing wall-clock training speed on the GPU, Model B's median epoch time
+($10.3$~s) is almost identical to Model A's ($10.0$~s). Despite having $97.6\%$ fewer
+trainable parameters and significantly reduced theoretical MAC operations, Model B does
+not show a massive wall-clock speedup during training because the grouped depthwise
+convolutions have lower arithmetic intensity (FLOPs per byte transferred) compared to dense
+convolutions, which fully saturate GPU tensor cores. On edge hardware with specialized
+runtimes (such as TFLite with XNNPACK or mobile NPUs), the substantial reduction in total
+operations and memory footprint allows Model B to execute efficiently within strict embedded
+SRAM and Flash memory budgets where Model A would exceed available capacity.
 
 \section{SOTA Fine-Tuning and Evaluation}
 \label{sec:sota}
@@ -464,14 +456,14 @@ choices in edge/resource-constrained settings.
 
 \begin{table}[H]
 \centering
-\caption{SOTA fine-tuning results (5 epochs, Adam, $\text{lr}=10^{-4}$).}
+\caption{SOTA fine-tuning results (5 epochs, Adam, $\text{lr}=10^{-4}$, Tesla T4 GPU).}
 \label{tab:sota-results}
-\begin{tabular}{lrrrrr}
+\begin{tabular}{lrrrrrr}
 \toprule
-Model & Input & Params & Size (MB) & Test accuracy & Macro P / R \\
+Model & Input & Params & Size (MB) & Median time/epoch & Test accuracy & Macro P / R \\
 \midrule
-MobileNetV2 & $128\times128$ & 2{,}236{,}682 & 8.76 & \textbf{98.32\%} & 0.983 / 0.982 \\
-EfficientNet-B0 & $64\times64$ & 4{,}020{,}358 & 15.62 & 97.70\% & 0.976 / 0.976 \\
+MobileNetV2 & $128\times128$ & 2{,}236{,}682 & 8.77 & 28.6 s & \textbf{98.20\%} & 0.981 / 0.981 \\
+EfficientNet-B0 & $64\times64$ & 4{,}020{,}358 & 15.62 & 18.5 s & 97.51\% & 0.975 / 0.973 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -513,18 +505,18 @@ EfficientNet-B0 & $64\times64$ & 4{,}020{,}358 & 15.62 & 97.70\% & 0.976 / 0.976
  & \multicolumn{2}{c}{MobileNetV2} & \multicolumn{2}{c}{EfficientNet-B0} \\
 Class & Precision & Recall & Precision & Recall \\
 \midrule
-AnnualCrop            & 0.977 & 0.964 & 0.961 & 0.976 \\
-Forest                & 0.993 & 0.998 & 0.989 & 0.998 \\
-HerbaceousVegetation  & 0.980 & 0.980 & 0.971 & 0.967 \\
-Highway               & 0.979 & 0.981 & 0.978 & 0.963 \\
-Industrial            & 0.992 & 0.989 & 0.989 & 0.976 \\
-Pasture               & 0.970 & 0.960 & 0.951 & 0.977 \\
-PermanentCrop         & 0.965 & 0.960 & 0.967 & 0.944 \\
-Residential           & 0.991 & 1.000 & 0.978 & 0.996 \\
-River                 & 0.987 & 0.992 & 0.981 & 0.968 \\
-SeaLake               & 0.991 & 0.998 & 0.998 & 0.998 \\
+AnnualCrop            & 0.963 & 0.978 & 0.950 & 0.971 \\
+Forest                & 0.991 & 0.996 & 0.982 & 0.996 \\
+HerbaceousVegetation  & 0.987 & 0.978 & 0.959 & 0.984 \\
+Highway               & 0.981 & 0.976 & 0.981 & 0.965 \\
+Industrial            & 0.987 & 0.987 & 0.989 & 0.984 \\
+Pasture               & 0.967 & 0.963 & 0.973 & 0.950 \\
+PermanentCrop         & 0.970 & 0.955 & 0.972 & 0.939 \\
+Residential           & 0.996 & 0.996 & 0.987 & 0.996 \\
+River                 & 0.984 & 0.981 & 0.968 & 0.965 \\
+SeaLake               & 0.989 & 1.000 & 0.991 & 0.984 \\
 \midrule
-\textbf{Macro average} & \textbf{0.983} & \textbf{0.982} & \textbf{0.976} & \textbf{0.976} \\
+\textbf{Macro average} & \textbf{0.981} & \textbf{0.981} & \textbf{0.975} & \textbf{0.973} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -551,23 +543,23 @@ resolution.
 \toprule
 Model & Parameters & Size (MB) & Test accuracy & Size vs.\ Model B \\
 \midrule
-Model B (custom) & 13{,}288 & 0.062 & 89.76\% & $1\times$ \\
-MobileNetV2 (fine-tuned) & 2{,}236{,}682 & 8.76 & 98.32\% & $\sim 141\times$ \\
-EfficientNet-B0 (fine-tuned) & 4{,}020{,}358 & 15.62 & 97.70\% & $\sim 252\times$ \\
+Model B (custom) & 13{,}288 & 0.062 & 89.61\% & $1\times$ \\
+MobileNetV2 (fine-tuned) & 2{,}236{,}682 & 8.77 & 98.20\% & $\sim 141\times$ \\
+EfficientNet-B0 (fine-tuned) & 4{,}020{,}358 & 15.62 & 97.51\% & $\sim 252\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \paragraph{Accuracy.} The fine-tuned SOTA models outperform Model B by
-$7.9$--$8.6$ percentage points in test accuracy. This gap is the direct
-benefit of transfer learning: both SOTA models started from features
+$7.9$--$8.6$ percentage points in test accuracy ($98.20\%$ and $97.51\%$ vs.\ $89.61\%$).
+This gap is the direct benefit of transfer learning: both SOTA models started from features
 learned on millions of ImageNet images, while Model B was trained entirely
 from scratch on EuroSAT's 18{,}900 training images.
 
 \paragraph{Memory footprint.} The gap here runs the other way, and far more
 steeply: MobileNetV2's checkpoint is about $141\times$ larger than Model
 B's, and EfficientNet-B0's is about $252\times$ larger. In absolute terms,
-Model B's $63$~KB footprint is small enough to plausibly fit in the flash/RAM
+Model B's $63.9$~KB footprint is small enough to plausibly fit in the flash/RAM
 of a microcontroller-class device (e.g.\ typical Cortex-M class chips with
 hundreds of KB to a few MB of flash), whereas both SOTA models' $8$--$16$~MB
 footprints exceed that budget by two to three orders of magnitude and would
@@ -575,17 +567,15 @@ only be viable on richer edge hardware (e.g.\ a Raspberry Pi, a phone, or a
 device with a dedicated NPU and MB-scale memory).
 
 \paragraph{Computational cost.} Fine-tuning the SOTA models required far
-fewer epochs to reach a strong result (5 vs.\ 20 for the custom models),
+fewer epochs to reach high accuracy (5 vs.\ 20 for the custom models),
 reflecting the sample efficiency of transfer learning. However, each SOTA
-epoch was substantially more expensive on this CPU-only hardware --
-MobileNetV2's median epoch time (985~s) was roughly $13\times$ Model B's
-(93~s), and EfficientNet-B0's (1{,}258~s) roughly $14\times$. Total training
-wall-clock time therefore still favoured Model B for from-scratch training
-cost, while the SOTA models were more label/sample-efficient per epoch.
-Inference-time computational cost would need to be assessed separately (not
-measured in this assignment) and depends heavily on the deployment
-hardware's support for standard vs.\ depthwise-separable/grouped
-convolution kernels.
+epoch was computationally heavier: on the Tesla T4 GPU, MobileNetV2 required
+$28.58$~s per epoch (at $128\times128$) and EfficientNet-B0 required $18.49$~s per epoch,
+compared to Model B's $10.26$~s per epoch. Total training wall-clock time therefore still
+favoured Model B for from-scratch training cost, while the SOTA models were more label-efficient
+per epoch. Inference-time computational cost would need to be assessed separately (not
+measured in this assignment) and depends heavily on the deployment hardware's support for
+standard vs.\ depthwise-separable/grouped convolution kernels.
 
 \paragraph{Recommendation.} The choice between a custom sub-100k-parameter
 model and a fine-tuned SOTA model is fundamentally a question of \emph{where
