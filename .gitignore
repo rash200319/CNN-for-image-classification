@@ -3,3 +3,4 @@ __pycache__/
 archive
 outputs/
 .venv/
+results/
