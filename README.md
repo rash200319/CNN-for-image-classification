@@ -67,6 +67,7 @@ src/
   evaluate.py                Test metrics and confusion-matrix generation
   benchmark.py               Hardware latency, peak memory, and MAC/FLOP profiler
   predict.py                 Single-image and batch land-use inference CLI
+  export.py                  Edge deployment exporter (TorchScript & ONNX) with parity checks
   plot_history.py            Training/validation curve generator
   compare_runs.py            Comparison table aggregator across runs
   utils.py                   Shared parameter counting and helper utilities
@@ -74,6 +75,7 @@ tests/
   test_models.py             Architecture budget and tensor shape assertions
   test_benchmark.py          MAC/FLOP calculation assertions
   test_predict.py            Inference pipeline validation
+  test_export.py             TorchScript and ONNX export parity assertions
 notebooks/
   EN3150_A03_kaggle_colab.ipynb  Executed end-to-end cloud GPU training run
 outputs/                     Saved checkpoints, metrics.json, and plots
@@ -291,9 +293,21 @@ Classify any satellite image with top-K class confidences and visual bars:
 python -m src.predict --image path/to/sample.jpg --checkpoint outputs/modelb_adam/best_model.pt --model b --top-k 3
 ```
 
+### Edge Deployment Export (TorchScript & ONNX):
+
+Export trained PyTorch checkpoints to portable edge formats with numerical parity checks:
+
+```bash
+# Export Model B to TorchScript and ONNX
+python -m src.export --model b --checkpoint outputs/modelb_adam/best_model.pt
+
+# Export all custom models
+python -m src.export --all
+```
+
 ### Running Automated Unit Tests:
 
-Run the test suite verifying Model B's $\le 100,000$ parameter budget, output tensor shapes, MAC calculations, and the inference pipeline:
+Run the test suite verifying Model B's $\le 100,000$ parameter budget, output tensor shapes, MAC calculations, inference pipeline, and edge export parity:
 
 ```bash
 python -m unittest discover tests
@@ -319,6 +333,7 @@ The following tasks are completed and remaining:
 - [x] **Include outputs & artifacts**: Checkpoints, loss curves, confusion matrices, and metrics present in `outputs/`.
 - [x] **Report tables & figures update**: `report/main.tex` updated with Tesla T4 metrics and plots.
 - [x] **Hardware profiling & CLI tools**: Added `src/benchmark.py`, `src/predict.py`, and test suite.
+- [x] **Edge Deployment Export**: Added `src/export.py` supporting TorchScript & ONNX with numerical parity verification.
 - [ ] **Author Details (`report/main.tex`)**: Fill in group member names, index numbers, and university emails (lines 21–22).
 - [ ] **Dataset Sheet**: Confirm that the dataset information sheet referenced in the assignment brief has been filled in, and remove the `\todofill` note on line 64.
 - [ ] **Final Submission**:
