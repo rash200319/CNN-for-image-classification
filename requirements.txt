@@ -6,3 +6,4 @@ matplotlib
 scikit-learn
 Pillow
 tqdm
+onnx>=1.14
