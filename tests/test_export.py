@@ -34,6 +34,12 @@ class TestEdgeExport(unittest.TestCase):
 
     def test_onnx_export_and_validity(self):
         """ONNX model must export cleanly and pass onnx.checker validation."""
+        try:
+            import onnx
+            import onnxscript  # noqa: F401
+        except ImportError:
+            self.skipTest("onnx or onnxscript not installed")
+
         onnx_path = self.temp_dir / "model_b_test.onnx"
         saved_path, _ = export_onnx(self.model, self.dummy_input, onnx_path, opset_version=14)
 
