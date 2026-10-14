@@ -13,14 +13,17 @@ Each run writes:
 
 import argparse
 import csv
+import json
+import random
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
 from tqdm import tqdm
 
-from src.config import IMAGE_SIZE
+from src.config import IMAGE_SIZE, SEED, validate_image_size
 from src.data.dataset import get_dataloaders
 from src.models.model_a import ModelA
 from src.models.model_b import ModelB
@@ -62,25 +65,24 @@ def run_epoch(model, loader, criterion, device, optimizer=None):
     model.train() if is_train else model.eval()
 
     total_loss, correct, total = 0.0, 0, 0
-    torch.set_grad_enabled(is_train)
-    for images, labels in loader:
-        images, labels = images.to(device), labels.to(device)
+    with torch.set_grad_enabled(is_train):
+        for images, labels in loader:
+            images, labels = images.to(device), labels.to(device)
 
-        if is_train:
-            optimizer.zero_grad()
+            if is_train:
+                optimizer.zero_grad()
 
-        outputs = model(images)
-        loss = criterion(outputs, labels)
+            outputs = model(images)
+            loss = criterion(outputs, labels)
 
-        if is_train:
-            loss.backward()
-            optimizer.step()
+            if is_train:
+                loss.backward()
+                optimizer.step()
 
-        total_loss += loss.item() * images.size(0)
-        correct += (outputs.argmax(dim=1) == labels).sum().item()
-        total += images.size(0)
+            total_loss += loss.item() * images.size(0)
+            correct += (outputs.argmax(dim=1) == labels).sum().item()
+            total += images.size(0)
 
-    torch.set_grad_enabled(True)
     return total_loss / total, correct / total
 
 
@@ -94,11 +96,35 @@ def main():
     parser.add_argument("--img-size", type=int, default=IMAGE_SIZE)
     parser.add_argument("--run-name", type=str, default=None)
     args = parser.parse_args()
+    validate_image_size(args.img_size)
+
+    random.seed(SEED)
+    np.random.seed(SEED)
+    torch.manual_seed(SEED)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(SEED)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     run_name = args.run_name or f"model{args.model}_{args.optimizer}"
     run_dir = OUTPUT_DIR / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
+    with open(run_dir / "config.json", "w") as f:
+        json.dump(
+            {
+                "model": args.model,
+                "optimizer": args.optimizer,
+                "lr": args.lr,
+                "momentum": args.momentum,
+                "epochs": args.epochs,
+                "img_size": args.img_size,
+                "seed": SEED,
+                "device": str(device),
+                "torch_version": torch.__version__,
+                "numpy_version": np.__version__,
+            },
+            f,
+            indent=2,
+        )
 
     mean, std = normalization_for(args.model)
     train_loader, val_loader, _, classes = get_dataloaders(
