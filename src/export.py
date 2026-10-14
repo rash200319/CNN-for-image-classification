@@ -20,7 +20,7 @@ Usage:
 
 import argparse
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -31,7 +31,7 @@ try:
 except ImportError:
     HAS_ONNX = False
 
-from src.config import CLASS_NAMES, IMAGE_SIZE
+from src.config import CLASS_NAMES, IMAGE_SIZE, validate_image_size
 from src.models.model_a import ModelA
 from src.models.model_b import ModelB
 from src.models.pretrained import PRETRAINED_MODELS, build_pretrained
@@ -78,8 +78,8 @@ def export_onnx(
     dummy_input: torch.Tensor,
     out_path: Path,
     opset_version: int = 14,
-) -> Tuple[Path, float]:
-    """Export model to ONNX, validate graph, and verify output parity."""
+) -> Tuple[Path, Optional[float]]:
+    """Export model to ONNX, validate graph, and verify output parity when possible."""
     if not HAS_ONNX:
         raise ImportError("Package 'onnx' is required for ONNX export. Install via: pip install onnx")
 
@@ -110,7 +110,7 @@ def export_onnx(
     onnx.checker.check_model(onnx_model)
 
     # If onnxruntime is installed, check numerical parity
-    max_diff = 0.0
+    max_diff = None
     try:
         import onnxruntime as ort
         session = ort.InferenceSession(str(out_path), providers=["CPUExecutionProvider"])
@@ -121,7 +121,7 @@ def export_onnx(
         max_diff = (orig_out - onnx_out).abs().max().item()
         assert torch.allclose(orig_out, onnx_out, atol=1e-4), f"ONNX parity failure: max diff {max_diff}"
     except ImportError:
-        pass  # onnxruntime optional; graph validation succeeded via onnx.checker
+        pass  # Graph validation still ran; numerical parity was not tested.
 
     return out_path, max_diff
 
@@ -132,15 +132,17 @@ def export_and_benchmark(
     out_dir: Path,
     img_size: int = IMAGE_SIZE,
     opset_version: int = 14,
-) -> Dict[str, any]:
+) -> Dict[str, Any]:
     """Perform end-to-end export to TorchScript & ONNX and return size/parity metrics."""
+    validate_image_size(img_size)
+    if not checkpoint_path.exists():
+        raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
     device = torch.device("cpu")
     num_classes = len(CLASS_NAMES)
 
     model = build_model(model_name, num_classes=num_classes).to(device)
-    if checkpoint_path.exists():
-        state_dict = torch.load(checkpoint_path, map_location=device)
-        model.load_state_dict(state_dict)
+    state_dict = torch.load(checkpoint_path, map_location=device)
+    model.load_state_dict(state_dict)
     model.eval()
 
     dummy_input = torch.randn(1, 3, img_size, img_size, device=device)
@@ -165,6 +167,7 @@ def export_and_benchmark(
         "onnx_kb": round(onnx_kb, 1),
         "ts_max_diff": ts_max_diff,
         "onnx_max_diff": onnx_max_diff,
+        "onnx_parity_tested": onnx_max_diff is not None,
         "ts_path": str(ts_path),
         "onnx_path": str(onnx_path),
     }
@@ -189,7 +192,8 @@ def main():
             ("b", Path("outputs/modelb_adam/best_model.pt"), IMAGE_SIZE),
         ]
     else:
-        img_size = args.img_size or (128 if args.model == "mobilenet_v2" else IMAGE_SIZE)
+        img_size = args.img_size or IMAGE_SIZE
+        validate_image_size(img_size)
         chk = (
             Path(args.checkpoint)
             if args.checkpoint
@@ -219,7 +223,9 @@ def main():
         print(f"    [OK] TorchScript: {res['ts_path']} ({res['torchscript_kb']} KB)")
         print(f"         Parity (max abs diff): {res['ts_max_diff']:.2e}")
         print(f"    [OK] ONNX:        {res['onnx_path']} ({res['onnx_kb']} KB)")
-        print(f"         Parity (max abs diff): {res['onnx_max_diff']:.2e}")
+        parity = res["onnx_max_diff"]
+        parity_text = f"{parity:.2e}" if parity is not None else "not tested"
+        print(f"         Parity (max abs diff): {parity_text}")
 
     print("\n" + "=" * 65)
     print("  Summary: On-Disk Edge Footprint Comparison")
