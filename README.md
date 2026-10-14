@@ -260,6 +260,20 @@ The local unit-test suite is run with:
 python -m unittest discover -s tests
 ```
 
+Latest local validation on `assignment-compliance-sync`:
+
+```text
+Ran 15 tests in 1.733s
+OK (skipped=1)
+```
+
+The skipped test requires optional ONNX runtime support. The full notebook
+rerun was not executed in this Windows checkout because the configured
+`archive\EuroSAT` path is absent and the notebook requires a Kaggle/Colab GPU
+for the complete 20-epoch custom and 5-epoch SOTA experiments. The notebook
+has been reset to a clean state and pushed to this branch; run all cells on
+Kaggle/Colab, then download and preserve the generated result files.
+
 ## Important notes
 
 - The dataset split is generated deterministically using seed 42.
