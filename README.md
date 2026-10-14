@@ -59,6 +59,7 @@ Classes:
 src/
   config.py                  Dataset and training configuration
   data/dataset.py            Dataset loading, augmentation, and splitting
+  data/verify_dataset.py     Dataset verification and statistical profiling tool
   models/model_a.py          Standard convolutional CNN (549k params)
   models/model_b.py          Lightweight depthwise-separable CNN (13k params)
   models/blocks.py           Reusable depthwise-separable conv block
@@ -76,6 +77,11 @@ tests/
   test_benchmark.py          MAC/FLOP calculation assertions
   test_predict.py            Inference pipeline validation
   test_export.py             TorchScript and ONNX export parity assertions
+  test_dataset_verification.py Dataset split distribution assertions
+docs/
+  DATASET.md                 EuroSAT statistical profile and class breakdown
+.github/workflows/
+  ci.yml                     Automated CI workflow testing Python 3.11 & 3.12
 notebooks/
   EN3150_A03_kaggle_colab.ipynb  Executed end-to-end cloud GPU training run
 outputs/                     Saved checkpoints, metrics.json, and plots
@@ -305,13 +311,24 @@ python -m src.export --model b --checkpoint outputs/modelb_adam/best_model.pt
 python -m src.export --all
 ```
 
-### Running Automated Unit Tests:
+### Dataset Verification & Statistical Profiling:
 
-Run the test suite verifying Model B's $\le 100,000$ parameter budget, output tensor shapes, MAC calculations, inference pipeline, and edge export parity:
+Verify dataset integrity, image resolutions (64x64), class balance, and stratified split counts (70/15/15):
+
+```bash
+# Verify dataset and export statistical markdown profile
+python -m src.data.verify_dataset --export-md docs/DATASET.md
+```
+
+### Running Automated Unit Tests & Continuous Integration (CI):
+
+Run the test suite verifying Model B's $\le 100,000$ parameter budget, output tensor shapes, MAC calculations, inference pipeline, edge export parity, and dataset splits:
 
 ```bash
 python -m unittest discover tests
 ```
+
+*Note: Automated CI is configured via `.github/workflows/ci.yml` to run the full test suite and CPU benchmark verification across Python 3.11 and 3.12 on every push and pull request.*
 
 ## Cloud Execution (Kaggle / Colab)
 
@@ -334,6 +351,7 @@ The following tasks are completed and remaining:
 - [x] **Report tables & figures update**: `report/main.tex` updated with Tesla T4 metrics and plots.
 - [x] **Hardware profiling & CLI tools**: Added `src/benchmark.py`, `src/predict.py`, and test suite.
 - [x] **Edge Deployment Export**: Added `src/export.py` supporting TorchScript & ONNX with numerical parity verification.
+- [x] **CI & Dataset Profiling**: Added GitHub Actions CI workflow (`.github/workflows/ci.yml`) and dataset verification tool (`src/data/verify_dataset.py`).
 - [ ] **Author Details (`report/main.tex`)**: Fill in group member names, index numbers, and university emails (lines 21–22).
 - [ ] **Dataset Sheet**: Confirm that the dataset information sheet referenced in the assignment brief has been filled in, and remove the `\todofill` note on line 64.
 - [ ] **Final Submission**:
