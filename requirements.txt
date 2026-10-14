@@ -7,3 +7,4 @@ scikit-learn
 Pillow
 tqdm
 onnx>=1.14
+onnxscript>=0.1
