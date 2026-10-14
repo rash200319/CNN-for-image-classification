@@ -45,6 +45,32 @@ The small rounding difference in the split counts is due to integer sample
 allocation. Images are resized to 64x64 by the data pipeline. Training, prediction,
 export, and benchmarking reject requested sizes above 64x64.
 
+### Portable dataset-resolution audit
+
+The repository includes a full-dataset audit that does not assume a
+machine-specific path. It scans every supported image, reports the resolution
+distribution, and fails if an image is larger than the assignment maximum:
+
+```bash
+python tests/test_dataset_resolution.py --dataset-dir /path/to/EuroSAT
+```
+
+The dataset location can also be supplied through `EUROSAT_DIR`:
+
+```bash
+EUROSAT_DIR=/path/to/EuroSAT python tests/test_dataset_resolution.py
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:EUROSAT_DIR = "D:\datasets\EuroSAT"
+python tests/test_dataset_resolution.py
+```
+
+For the RGB EuroSAT dataset, the expected result is 27,000 images at 64x64
+with no unreadable files, followed by a `PASS` message.
+
 Classes:
 
 1. AnnualCrop
