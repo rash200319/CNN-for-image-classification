@@ -5,7 +5,7 @@ from pathlib import Path
 import torch
 
 from src.models.model_b import ModelB
-from src.export import export_torchscript, export_onnx
+from src.export import export_torchscript, export_onnx, export_and_benchmark
 
 
 class TestEdgeExport(unittest.TestCase):
@@ -45,6 +45,14 @@ class TestEdgeExport(unittest.TestCase):
 
         self.assertTrue(saved_path.exists())
         self.assertGreater(saved_path.stat().st_size, 0)
+
+    def test_export_requires_checkpoint(self):
+        with self.assertRaises(FileNotFoundError):
+            export_and_benchmark(
+                "b",
+                self.temp_dir / "missing.pt",
+                self.temp_dir,
+            )
 
 
 if __name__ == "__main__":
