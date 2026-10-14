@@ -5,7 +5,7 @@ Usage:
     python -m src.predict --image path/to/image.jpg --checkpoint outputs/modelb_adam/best_model.pt --model b
 
     # Single image inference with Pretrained MobileNetV2
-    python -m src.predict --image path/to/image.jpg --checkpoint outputs/final_mobilenet_v2/best_model.pt --model mobilenet_v2 --img-size 128
+    python -m src.predict --image path/to/image.jpg --checkpoint outputs/final_mobilenet_v2/best_model.pt --model mobilenet_v2 --img-size 64
 """
 
 import argparse
@@ -17,7 +17,7 @@ import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
 
-from src.config import CLASS_NAMES, IMAGE_SIZE
+from src.config import CLASS_NAMES, IMAGE_SIZE, validate_image_size
 from src.models.model_a import ModelA
 from src.models.model_b import ModelB
 from src.models.pretrained import IMAGENET_MEAN, IMAGENET_STD, PRETRAINED_MODELS, build_pretrained
@@ -36,6 +36,7 @@ def build_model(name: str, num_classes: int) -> torch.nn.Module:
 
 def get_inference_transform(model_name: str, img_size: int) -> transforms.Compose:
     """Construct data preprocessing pipeline consistent with training."""
+    validate_image_size(img_size)
     if model_name in PRETRAINED_MODELS:
         mean, std = IMAGENET_MEAN, IMAGENET_STD
     else:
@@ -101,9 +102,10 @@ def main():
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
     if args.img_size is None:
-        img_size = 128 if args.model == "mobilenet_v2" else IMAGE_SIZE
+        img_size = IMAGE_SIZE
     else:
         img_size = args.img_size
+    validate_image_size(img_size)
 
     if args.device == "auto":
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
