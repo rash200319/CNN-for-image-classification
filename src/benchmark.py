@@ -1,10 +1,14 @@
-"""Hardware-aware benchmarking tool for edge image classification models.
+"""Synthetic-input architecture benchmarking tool.
 
 Computes:
 1. Theoretical multiply-accumulate operations (MACs) and floating-point operations (FLOPs).
 2. Single-image and batch inference latency (milliseconds).
 3. Throughput (frames / images per second).
 4. Peak memory allocation during forward pass.
+
+The latency and throughput values use newly initialized models and synthetic
+inputs. They are indicative software measurements, not trained-checkpoint or
+physical edge-device performance.
 
 Usage:
     python -m src.benchmark --device cpu
@@ -24,6 +28,7 @@ import torch.nn as nn
 from src.models.model_a import ModelA
 from src.models.model_b import ModelB
 from src.models.pretrained import PRETRAINED_MODELS, build_pretrained
+from src.config import IMAGE_SIZE
 from src.utils import count_parameters
 
 
@@ -111,10 +116,10 @@ def measure_latency(
 def benchmark_all(device: torch.device, batch_size: int = 1, runs: int = 100) -> pd.DataFrame:
     """Benchmark Model A, Model B, MobileNetV2, and EfficientNet-B0."""
     models_config = [
-        ("Model A (Standard CNN)", ModelA(num_classes=10), (64, 64)),
-        ("Model B (Depthwise-Sep. CNN)", ModelB(num_classes=10), (64, 64)),
-        ("MobileNetV2 (Pretrained)", build_pretrained("mobilenet_v2", num_classes=10), (128, 128)),
-        ("EfficientNet-B0 (Pretrained)", build_pretrained("efficientnet_b0", num_classes=10), (64, 64)),
+        ("Model A (Standard CNN)", ModelA(num_classes=10), (IMAGE_SIZE, IMAGE_SIZE)),
+        ("Model B (Depthwise-Sep. CNN)", ModelB(num_classes=10), (IMAGE_SIZE, IMAGE_SIZE)),
+        ("MobileNetV2 (Pretrained)", build_pretrained("mobilenet_v2", num_classes=10), (IMAGE_SIZE, IMAGE_SIZE)),
+        ("EfficientNet-B0 (Pretrained)", build_pretrained("efficientnet_b0", num_classes=10), (IMAGE_SIZE, IMAGE_SIZE)),
     ]
 
     records = []
@@ -133,6 +138,7 @@ def benchmark_all(device: torch.device, batch_size: int = 1, runs: int = 100) ->
                 "Latency (ms/img)": metrics["per_sample_latency_ms"],
                 "Throughput (img/s)": metrics["throughput_fps"],
                 "Device": device.type.upper(),
+                "Measurement": "synthetic input, untrained model",
             }
         )
 
