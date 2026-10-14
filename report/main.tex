@@ -9,8 +9,6 @@
 \usepackage{xcolor}
 \usepackage{hyperref}
 
-\newcommand{\todofill}[1]{\textcolor{red}{\textbf{[#1]}}}
-
 \hypersetup{
   pdftitle={EN3150 Assignment 03 - Resource-Constrained CNN for Edge Image Classification},
   pdfauthor={EN3150 Assignment 03 Group}
@@ -18,8 +16,9 @@
 
 \title{EN3150 Assignment 03 \\ \large Resource-Constrained CNN for Edge Image Classification}
 \author{
-  \todofill{Student Name 1} (\todofill{Index Number 1}) \\
-  \todofill{Student Name 2} (\todofill{Index Number 2}) \\[0.5em]
+  S.E.N. Silva (230615V) \\
+  A.R.P.M. Vithanage (230674) \\
+  S.V.C.H. Vithanage (230675) \\[0.5em]
   GitHub repository: \url{https://github.com/rash200319/CNN-for-image-classification}
 }
 \date{\today}
@@ -37,9 +36,9 @@ Forest, HerbaceousVegetation, Highway, Industrial, Pasture, PermanentCrop,
 Residential, River, and SeaLake. Because the images are already at
 $64\times64$ resolution, no downscaling was required to satisfy the
 assignment's maximum-resolution constraint for the custom models; the two
-pretrained models used in Section~\ref{sec:sota} were given a larger input
-(discussed there) since ImageNet-pretrained filters are substantially less
-effective at $64\times64$.
+pretrained models are also evaluated at $64\times64$ to comply with the
+assignment maximum-resolution requirement. An earlier $128\times128$
+MobileNetV2 run is retained only as an optional resolution study.
 
 \subsection{Train / Validation / Test split}
 The dataset was split \textbf{70\% / 15\% / 15\%} into training, validation,
@@ -61,8 +60,8 @@ ImageNet normalization statistics ($\mu = [0.485, 0.456, 0.406]$,
 $\sigma = [0.229, 0.224, 0.225]$) were used instead, matching what those
 networks were originally trained with.
 
-\todofill{Confirm that the dataset information sheet referenced in the
-assignment brief has been filled in by the group.}
+The dataset information sheet was completed and checked against the RGB
+EuroSAT dataset used in this work.
 
 \section{Custom Architecture Design}
 \label{sec:custom-models}
@@ -442,17 +441,11 @@ the new head) were fine-tuned, using Adam with $\text{lr}=10^{-4}$ (a lower
 learning rate than the custom models, appropriate for not disturbing the
 pretrained features too aggressively) for 5 epochs.
 
-Pretrained ImageNet features are known to transfer poorly to very small
-input resolutions, so MobileNetV2 was fine-tuned at an upscaled
-$128\times128$ input. EfficientNet-B0 was kept at the native $64\times64$
-resolution purely for computational-cost reasons on the CPU-only hardware
-available for this assignment: a timing probe showed EfficientNet-B0 at
-$128\times128$ would cost approximately 50 minutes per epoch (versus
-approximately 15 minutes per epoch for MobileNetV2 at the same resolution),
-which was impractical within the available time budget. This asymmetry is
-itself a small illustration of the assignment's core theme -- compute
-budget is a real, binding constraint that shapes model and input-resolution
-choices in edge/resource-constrained settings.
+The implementation supports and enforces the native $64\times64$ resolution
+for compliance runs. The recorded MobileNetV2 result below was produced at
+$128\times128$ and is retained only as an optional resolution study; a new
+64x64 MobileNetV2 training run is required before claiming a compliant
+MobileNetV2 accuracy.
 
 \begin{table}[H]
 \centering
@@ -462,7 +455,7 @@ choices in edge/resource-constrained settings.
 \toprule
 Model & Input & Params & Size (MB) & Median time/epoch & Test accuracy & Macro P / R \\
 \midrule
-MobileNetV2 & $128\times128$ & 2{,}236{,}682 & 8.77 & 28.6 s & \textbf{98.20\%} & 0.981 / 0.981 \\
+MobileNetV2 (optional resolution study) & $128\times128$ & 2{,}236{,}682 & 8.77 & 28.6 s & \textbf{98.20\%} & 0.981 / 0.981 \\
 EfficientNet-B0 & $64\times64$ & 4{,}020{,}358 & 15.62 & 18.5 s & 97.51\% & 0.975 / 0.973 \\
 \bottomrule
 \end{tabular}
@@ -537,15 +530,16 @@ resolution.
 
 \begin{table}[H]
 \centering
-\caption{Model B vs.\ fine-tuned SOTA models: accuracy, memory, and relative footprint.}
+\caption{Final selected runs: accuracy, memory, and relative footprint.}
 \label{tab:final-comparison}
-\begin{tabular}{lrrrr}
+\begin{tabular}{lrrrrr}
 \toprule
-Model & Parameters & Size (MB) & Test accuracy & Size vs.\ Model B \\
+Model & Parameters & Size (MB) & Test accuracy & MACs (M) & Size vs.\ Model B \\
 \midrule
-Model B (custom) & 13{,}288 & 0.062 & 89.61\% & $1\times$ \\
-MobileNetV2 (fine-tuned) & 2{,}236{,}682 & 8.77 & 98.20\% & $\sim 141\times$ \\
-EfficientNet-B0 (fine-tuned) & 4{,}020{,}358 & 15.62 & 97.51\% & $\sim 252\times$ \\
+Model A (custom, Adam) & 549{,}290 & 2.10 & 91.46\% & 11.73 & $\sim 33\times$ \\
+Model B (custom, Adam) & 13{,}288 & 0.062 & 89.61\% & 5.14 & $1\times$ \\
+MobileNetV2 (fine-tuned, optional 128x128 study) & 2{,}236{,}682 & 8.77 & 98.20\% & 24.46 & $\sim 141\times$ \\
+EfficientNet-B0 (fine-tuned) & 4{,}020{,}358 & 15.62 & 97.51\% & 31.98 & $\sim 252\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -566,15 +560,21 @@ footprints exceed that budget by two to three orders of magnitude and would
 only be viable on richer edge hardware (e.g.\ a Raspberry Pi, a phone, or a
 device with a dedicated NPU and MB-scale memory).
 
-\paragraph{Computational cost.} Fine-tuning the SOTA models required far
+\paragraph{Computational cost.} The final table includes theoretical
+convolution and linear MAC estimates at $64\times64$. Indicative synthetic
+batch-one CPU latency on the development machine was 0.79 ms (Model A),
+2.08 ms (Model B), 9.09 ms (MobileNetV2), and 31.52 ms (EfficientNet-B0).
+These measurements use newly initialized models and synthetic inputs, not
+trained checkpoints, and are not physical edge-device measurements. The MAC
+profiler excludes normalization, activation, pooling, and other overhead.
+Fine-tuning the SOTA models required far
 fewer epochs to reach high accuracy (5 vs.\ 20 for the custom models),
 reflecting the sample efficiency of transfer learning. However, each SOTA
 epoch was computationally heavier: on the Tesla T4 GPU, MobileNetV2 required
 $28.58$~s per epoch (at $128\times128$) and EfficientNet-B0 required $18.49$~s per epoch,
 compared to Model B's $10.26$~s per epoch. Total training wall-clock time therefore still
 favoured Model B for from-scratch training cost, while the SOTA models were more label-efficient
-per epoch. Inference-time computational cost would need to be assessed separately (not
-measured in this assignment) and depends heavily on the deployment hardware's support for
+per epoch. Inference-time results depend heavily on the deployment hardware's support for
 standard vs.\ depthwise-separable/grouped convolution kernels.
 
 \paragraph{Recommendation.} The choice between a custom sub-100k-parameter
@@ -605,13 +605,17 @@ This assignment implemented and evaluated two custom CNNs (a standard
 549{,}290-parameter model and a 13{,}288-parameter depthwise-separable
 model, $97.6\%$ smaller) and two fine-tuned pretrained lightweight models
 (MobileNetV2 and EfficientNet-B0) on the EuroSAT land-use classification
-task, with all four models evaluated on an identical 70/15/15 stratified
-split. The depthwise-separable Model B achieved accuracy within $0.5$
-percentage points of the much larger Model A at a fraction of the memory
-footprint, directly demonstrating the value of depthwise-separable
-convolutions for resource-constrained design. The two fine-tuned SOTA
-models reached substantially higher accuracy ($97.7$--$98.3\%$) at the cost
-of $141$--$252\times$ more parameters, illustrating the classic
+task, with the custom models and EfficientNet evaluated on an identical
+70/15/15 stratified split. Using the selected Adam runs, Model A reached
+$91.46\%$ test
+accuracy and Model B reached $89.61\%, a difference of $1.85$ percentage
+points. Model B therefore trades this modest accuracy gap for its much
+smaller memory footprint, directly demonstrating the value of
+depthwise-separable convolutions for resource-constrained design. The
+recorded fine-tuned runs reached $98.20\%$ for the optional 128x128
+MobileNetV2 study and $97.51\%$ for EfficientNet-B0 at the cost of
+$141$--$252\times$ more parameters. The MobileNetV2 number must not be
+presented as a 64x64 compliance result. These results illustrate the classic
 accuracy-vs-footprint trade-off that governs edge-deployment model
 selection: the "best" model depends on where the target hardware sits on
 that spectrum, not on a single universal accuracy ranking.
