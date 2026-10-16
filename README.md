@@ -5,24 +5,28 @@ resource-constrained image-classification task.
 
 ## Current completion status
 
-The custom CNN foundation is implemented and tested locally. The complete
-assignment report and all required experiments are not yet finished.
+The custom CNN foundation, both SOTA fine-tunes, and the written report are
+all implemented. One experiment (compliant 64x64 MobileNetV2) is still
+outstanding.
 
 | Area | Status |
 |---|---|
 | EuroSAT dataset and preprocessing | Complete |
 | 70/15/15 stratified data split | Complete |
-| 64x64 maximum-resolution enforcement | Complete |
+| 64x64 maximum-resolution enforcement | Complete (code-level, via `validate_image_size`) |
 | Model A standard CNN | Complete |
 | Model B depthwise-separable CNN | Complete |
 | Model B parameter budget | Complete |
-| Model A Adam training | Complete |
-| Model B Adam training | Complete |
+| Model A Adam training | Complete (91.46%, Tesla T4) |
+| Model B Adam training | Complete (89.61%, Tesla T4) |
 | SGD and SGD-with-Momentum comparison | Complete for Model B |
 | Test evaluation and confusion matrices | Complete for completed runs |
 | Training/validation loss plots | Complete for recorded runs |
-| Two pretrained lightweight SOTA models | Complete in the Kaggle notebook; MobileNetV2 128x128 is optional only |
-| Final written report and trade-off discussion | Complete; compile and inspect the final PDF |
+| EfficientNet-B0 (64x64, compliant) | Complete (97.51%) |
+| MobileNetV2 (64x64, compliant) | **Outstanding** — only a 128x128 "optional study" (98.20%) exists |
+| Author details, dataset sheet confirmation | Complete |
+| Final written report (`report/main.tex`) | Complete |
+| `report/main.pdf` matches `main.tex` | Complete (recompile after any `.tex` edit — it does not happen automatically) |
 
 The report's final Model A result (91.46%) comes from the Kaggle/T4
 `final_a_adam` run. The local `outputs/modela_adam` directory is a separate
@@ -31,7 +35,7 @@ local run (89.66%) and must not be mixed with the report's Kaggle metrics.
 ## Dataset
 
 The project uses the RGB version of the EuroSAT dataset. It is stored locally
-under `archive (1)/EuroSAT/EuroSAT`.
+under `archive/EuroSAT` (see `src/config.py`).
 
 - Images: 27,000
 - Classes: 10
@@ -88,16 +92,36 @@ Classes:
 
 ```text
 src/
-  config.py                  Dataset and training configuration
+  config.py                  Dataset/training config; MAX_IMAGE_SIZE=64 enforcement
   data/dataset.py            Dataset loading, augmentation, and splitting
-  models/model_a.py          Standard convolutional CNN
-  models/model_b.py          Lightweight depthwise-separable CNN
-  models/blocks.py           Reusable depthwise-separable block
-  train.py                   Training entry point
+  data/verify_dataset.py     Dataset verification and statistical profiling tool
+  models/model_a.py          Standard convolutional CNN (549k params)
+  models/model_b.py          Lightweight depthwise-separable CNN (13k params)
+  models/blocks.py           Reusable depthwise-separable conv block
+  models/pretrained.py       ImageNet backbones (MobileNetV2, EfficientNet-B0)
+  train.py                   Training entry point (--img-size capped at 64)
   evaluate.py                Test metrics and confusion-matrix generation
-  utils.py                   Shared utilities
-outputs/
-  modela_adam/              Existing Model A training artifacts
+  benchmark.py                Hardware latency, peak memory, and MAC/FLOP profiler
+  predict.py                  Single-image and batch land-use inference CLI
+  export.py                   Edge deployment exporter (TorchScript & ONNX) with parity checks
+  plot_history.py            Training/validation curve generator
+  compare_runs.py            Comparison table aggregator across runs
+  utils.py                   Shared parameter counting and helper utilities
+tests/
+  test_models.py              Architecture budget and tensor shape assertions
+  test_benchmark.py           MAC/FLOP calculation assertions
+  test_predict.py             Inference pipeline validation
+  test_export.py              TorchScript and ONNX export parity assertions
+  test_dataset_verification.py  Dataset split distribution assertions
+  test_dataset_resolution.py  Portable full-dataset resolution audit (see below)
+docs/
+  DATASET.md                  EuroSAT statistical profile and class breakdown
+.github/workflows/
+  ci.yml                      CI: runs the test suite on Python 3.11 & 3.12
+notebooks/
+  EN3150_A03_kaggle_colab.ipynb  Cloud GPU training run (Model A/B, SOTA, plots)
+outputs/                      Checkpoints, metrics.json, history.csv, plots per run
+report/                       LaTeX source (main.tex), figures/, and main.pdf
 ```
 
 ## Custom CNNs
@@ -140,70 +164,62 @@ operations required by sigmoid or tanh.
 
 ## Existing training evidence
 
-Model A has been trained with Adam for 20 epochs:
+**The numbers below are the report's authoritative results** (`report/main.tex`,
+sourced from the Kaggle Tesla T4 notebook run). Both Model A and Model B were
+trained for 20 epochs with Adam (lr=1e-3) unless noted otherwise.
 
-- Run directory: `outputs/modela_adam`
-- History: `outputs/modela_adam/history.csv`
-- Checkpoint: `outputs/modela_adam/best_model.pt`
-- Final training accuracy: **91.99%**
-- Best recorded validation accuracy: **88.84%**
-- Approximate checkpoint size: **2,150.1 KB**
-- Approximate average epoch time: **48 seconds**
-
-The final test evaluation for this checkpoint is:
-
-- Test accuracy: **89.66%**
-- Macro precision: **0.9021**
-- Macro recall: **0.8920**
-
-The validation accuracy and test accuracy are reported separately.
-
-Model B has now been trained for 20 epochs with Adam, plain SGD, and SGD with
-momentum. The resulting test metrics are:
-
-| Run | Test accuracy | Macro precision | Macro recall | Average epoch time |
+| Model | Parameters | Checkpoint size | Median time/epoch (T4 GPU) | Test accuracy |
 |---|---:|---:|---:|---:|
-| Model B + Adam | **89.76%** | 0.8948 | 0.8963 | 92.08 s |
-| Model B + SGD | 82.35% | 0.8163 | 0.8161 | 87.64 s |
-| Model B + SGD + momentum (0.9) | 89.41% | 0.8924 | 0.8913 | 87.63 s |
+| Model A (Adam) | 549,290 | 2,150.1 KB | 10.0 s | **91.46%** |
+| Model B (Adam) | 13,288 | 63.9 KB | 10.3 s | **89.61%** |
 
-The Adam and momentum runs substantially outperformed plain SGD under these
-learning-rate settings. Momentum improved SGD convergence by carrying a
-velocity term from previous updates, reducing oscillation and helping the
-optimizer move through shallow or noisy regions of the loss surface. In this
-experiment, momentum reached a much stronger result than plain SGD and was
-close to Adam.
+Model B optimizer comparison (20 epochs each, Tesla T4 GPU):
 
-Generated artifacts are stored in:
+| Run | Test accuracy | Macro precision | Macro recall |
+|---|---:|---:|---:|
+| Model B + Adam | **89.61%** | 0.8975 | 0.8918 |
+| Model B + SGD | 81.26% | 0.8095 | 0.8042 |
+| Model B + SGD + momentum (0.9) | 87.71% | 0.8822 | 0.8723 |
 
-- `outputs/modela_adam/`
-- `outputs/modelb_adam/`
-- `outputs/modelb_sgd/`
-- `outputs/modelb_sgd_momentum/`
+Adam and SGD+momentum (same lr=1e-2 as plain SGD, isolating momentum's
+effect) both substantially outperform plain SGD. Momentum's velocity term
+dampens oscillation and effectively increases the step size in consistent
+gradient directions, closing most of the gap to Adam despite the much
+simpler update rule.
 
-Approximate FP32 parameter storage calculated from the verified parameter
-counts:
+Model B uses about 97.6% fewer trainable parameters than Model A for a
+1.85-percentage-point accuracy cost — a strong case for the
+depthwise-separable design. See `report/main.tex` Section 4 for the full
+discussion, loss curves, and confusion matrices.
 
-| Model | Trainable parameters | Approximate FP32 size |
-|---|---:|---:|
-| Model A | 549,290 | 2,145.7 KB |
-| Model B | 13,288 | 51.9 KB |
+**Known gap:** `outputs/modelb_adam`, `outputs/modelb_sgd`, and
+`outputs/modelb_sgd_momentum` contain the actual Tesla T4 checkpoints/metrics
+matching the numbers above. `outputs/final_a_adam` still contains an older
+local CPU run (90.27%) rather than the Kaggle-downloaded 91.46% artifacts —
+the report's Model A figures were regenerated from the Kaggle run, but the
+matching `metrics.json`/`history.csv`/checkpoint were not re-downloaded into
+this repo. Also present: `outputs/modela_adam`, a separate earlier local run
+(89.66%) — do not confuse either with the report's 91.46% figure.
 
-The actual checkpoint size can differ because checkpoints may also contain
-metadata or serialization overhead.
+## SOTA fine-tuning (MobileNetV2 and EfficientNet-B0)
 
-Custom-model Adam comparison:
+Two ImageNet-pretrained models were fine-tuned end-to-end on the same splits,
+5 epochs each, Adam (lr=1e-4):
 
-| Model | Parameters | Checkpoint size | Average epoch time | Test accuracy |
-|---|---:|---:|---:|---:|
-| Model A + Adam | 549,290 | 2,150.1 KB | 49.65 s | 89.66% |
-| Model B + Adam | 13,288 | 63.4 KB | 92.08 s | 89.76% |
+| Model | Input | Params | Size (MB) | Median time/epoch (T4) | Test accuracy |
+|---|---:|---:|---:|---:|---:|
+| EfficientNet-B0 | 64x64 (compliant) | 4,020,358 | 15.62 | 18.5 s | **97.51%** |
+| MobileNetV2 | 128x128 (**optional study only**) | 2,236,682 | 8.77 | 28.6 s | 98.20% |
 
-Model B uses approximately 97.6% fewer trainable parameters than Model A and
-achieved a very similar test accuracy in this experiment. Its CPU epoch time
-was higher in these runs, so parameter count and serialized size should not be
-treated as a direct measurement of wall-clock speed. Actual deployment cost
-also depends on the hardware kernel implementation and memory bandwidth.
+**MobileNetV2 has not yet been retrained at the compliant 64x64 resolution.**
+The 128x128 result above must not be presented as the compliant final
+number — see "Resolution and benchmark policy" below. Until a 64x64 rerun
+exists, EfficientNet-B0 is the only fully compliant SOTA result.
+
+Same `outputs/` gap as above: `outputs/final_mobilenet_v2` and
+`outputs/final_efficientnet_b0` still hold the earlier local CPU-run
+artifacts (98.32%/97.70%), not the Tesla T4 numbers cited in the report
+(98.20%/97.51%). Re-download the Kaggle run's `outputs/` folder to fix this.
 
 ## How to run
 
@@ -303,10 +319,15 @@ Kaggle/Colab, then download and preserve the generated result files.
 ## Important notes
 
 - The dataset split is generated deterministically using seed 42.
-- Model B's parameter budget is enforced with an assertion in the model
-  constructor.
-- Existing output files are currently generated artifacts and should be
-  intentionally included in version control if they are required for
-  submission.
-- No pretrained SOTA model implementation or final report is currently
-  included.
+- Model B's parameter budget (<= 100,000 parameters) is enforced with an
+  assertion in the model constructor; all entry points additionally reject
+  `--img-size` above 64 via `validate_image_size`.
+- `outputs/` is gitignored going forward, but several run directories
+  (`modela_adam`, `modelb_adam`, `modelb_sgd`, `modelb_sgd_momentum`,
+  `final_a_adam`, `final_mobilenet_v2`, `final_efficientnet_b0`) were
+  committed earlier and are still tracked — see the "known gap" notes above
+  for which of these match the report's current numbers.
+- Both pretrained SOTA models (MobileNetV2, EfficientNet-B0) and the final
+  LaTeX report (`report/main.tex` / `report/main.pdf`) are implemented and
+  present in this repository; only the compliant 64x64 MobileNetV2 rerun is
+  still outstanding.
