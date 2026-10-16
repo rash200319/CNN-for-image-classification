@@ -12,6 +12,7 @@ assignment report and all required experiments are not yet finished.
 |---|---|
 | EuroSAT dataset and preprocessing | Complete |
 | 70/15/15 stratified data split | Complete |
+| 64x64 maximum-resolution enforcement | Complete |
 | Model A standard CNN | Complete |
 | Model B depthwise-separable CNN | Complete |
 | Model B parameter budget | Complete |
@@ -19,15 +20,18 @@ assignment report and all required experiments are not yet finished.
 | Model B Adam training | Complete |
 | SGD and SGD-with-Momentum comparison | Complete for Model B |
 | Test evaluation and confusion matrices | Complete for completed runs |
-| Training/validation loss plots | Complete |
-| Two pretrained lightweight SOTA models | Complete |
-| Custom-model vs. SOTA comparison table | Outstanding |
-| Final written report and trade-off discussion | Outstanding |
+| Training/validation loss plots | Complete for recorded runs |
+| Two pretrained lightweight SOTA models | Complete in the Kaggle notebook; MobileNetV2 128x128 is optional only |
+| Final written report and trade-off discussion | Complete; compile and inspect the final PDF |
+
+The report's final Model A result (91.46%) comes from the Kaggle/T4
+`final_a_adam` run. The local `outputs/modela_adam` directory is a separate
+local run (89.66%) and must not be mixed with the report's Kaggle metrics.
 
 ## Dataset
 
 The project uses the RGB version of the EuroSAT dataset. It is stored locally
-under `archive/EuroSAT`.
+under `archive (1)/EuroSAT/EuroSAT`.
 
 - Images: 27,000
 - Classes: 10
@@ -38,7 +42,34 @@ under `archive/EuroSAT`.
 - Split method: stratified split with random seed 42
 
 The small rounding difference in the split counts is due to integer sample
-allocation. Images are resized to 64x64 by the data pipeline.
+allocation. Images are resized to 64x64 by the data pipeline. Training, prediction,
+export, and benchmarking reject requested sizes above 64x64.
+
+### Portable dataset-resolution audit
+
+The repository includes a full-dataset audit that does not assume a
+machine-specific path. It scans every supported image, reports the resolution
+distribution, and fails if an image is larger than the assignment maximum:
+
+```bash
+python tests/test_dataset_resolution.py --dataset-dir /path/to/EuroSAT
+```
+
+The dataset location can also be supplied through `EUROSAT_DIR`:
+
+```bash
+EUROSAT_DIR=/path/to/EuroSAT python tests/test_dataset_resolution.py
+```
+
+On Windows PowerShell:
+
+```powershell
+$env:EUROSAT_DIR = "D:\datasets\EuroSAT"
+python tests/test_dataset_resolution.py
+```
+
+For the RGB EuroSAT dataset, the expected result is 27,000 images at 64x64
+with no unreadable files, followed by a `PASS` message.
 
 Classes:
 
@@ -59,33 +90,14 @@ Classes:
 src/
   config.py                  Dataset and training configuration
   data/dataset.py            Dataset loading, augmentation, and splitting
-  data/verify_dataset.py     Dataset verification and statistical profiling tool
-  models/model_a.py          Standard convolutional CNN (549k params)
-  models/model_b.py          Lightweight depthwise-separable CNN (13k params)
-  models/blocks.py           Reusable depthwise-separable conv block
-  models/pretrained.py       ImageNet backbones (MobileNetV2, EfficientNet-B0)
+  models/model_a.py          Standard convolutional CNN
+  models/model_b.py          Lightweight depthwise-separable CNN
+  models/blocks.py           Reusable depthwise-separable block
   train.py                   Training entry point
   evaluate.py                Test metrics and confusion-matrix generation
-  benchmark.py               Hardware latency, peak memory, and MAC/FLOP profiler
-  predict.py                 Single-image and batch land-use inference CLI
-  export.py                  Edge deployment exporter (TorchScript & ONNX) with parity checks
-  plot_history.py            Training/validation curve generator
-  compare_runs.py            Comparison table aggregator across runs
-  utils.py                   Shared parameter counting and helper utilities
-tests/
-  test_models.py             Architecture budget and tensor shape assertions
-  test_benchmark.py          MAC/FLOP calculation assertions
-  test_predict.py            Inference pipeline validation
-  test_export.py             TorchScript and ONNX export parity assertions
-  test_dataset_verification.py Dataset split distribution assertions
-docs/
-  DATASET.md                 EuroSAT statistical profile and class breakdown
-.github/workflows/
-  ci.yml                     Automated CI workflow testing Python 3.11 & 3.12
-notebooks/
-  EN3150_A03_kaggle_colab.ipynb  Executed end-to-end cloud GPU training run
-outputs/                     Saved checkpoints, metrics.json, and plots
-report/                      LaTeX source (main.tex) and figures
+  utils.py                   Shared utilities
+outputs/
+  modela_adam/              Existing Model A training artifacts
 ```
 
 ## Custom CNNs
@@ -193,51 +205,6 @@ was higher in these runs, so parameter count and serialized size should not be
 treated as a direct measurement of wall-clock speed. Actual deployment cost
 also depends on the hardware kernel implementation and memory bandwidth.
 
-## SOTA fine-tuning (MobileNetV2 and EfficientNet-B0)
-
-Two ImageNet-pretrained lightweight models were fine-tuned end-to-end on the
-same EuroSAT splits, for 5 epochs each with Adam (lr=1e-4). Pretrained models
-need a larger input than the 64x64 used for Model A/B, so `src/train.py` and
-`src/evaluate.py` accept an `--img-size` flag; ImageNet normalization
-statistics are used automatically for these two models (see
-`src/models/pretrained.py`).
-
-| Model | Input size | Parameters | Checkpoint size | Test accuracy | Macro precision | Macro recall |
-|---|---:|---:|---:|---:|---:|---:|
-| MobileNetV2 | 128x128 | 2,236,682 | 8,972.6 KB | **98.32%** | 0.9826 | 0.9823 |
-| EfficientNet-B0 | 64x64 | 4,020,358 | 15,992.1 KB | **97.70%** | 0.9764 | 0.9761 |
-
-Both comfortably beat the from-scratch custom models (Model A: 89.66-90.27%,
-Model B: 82.35-89.76%, depending on run/optimizer) after only 5 epochs, as
-expected for transfer learning from ImageNet features. The same confusion
-pairs seen in Model A (Highway/River, HerbaceousVegetation/PermanentCrop,
-AnnualCrop/PermanentCrop) still show up in the confusion matrices here, just
-far smaller in magnitude, suggesting they're genuinely hard classes in this
-dataset rather than a weakness specific to the custom models.
-
-Per-epoch timing on this CPU-only machine was inconsistent (occasional
-epochs ran 3-5x longer than the rest, likely due to background system load),
-so epoch-time figures for these two runs should be treated as approximate
-and not used directly in the time/epoch comparison column.
-
-Generated artifacts:
-
-- `outputs/final_mobilenet_v2/` (checkpoint, history, confusion matrix, loss
-  curve, metrics.json)
-- `outputs/final_efficientnet_b0/` (same)
-
-To reproduce:
-
-```bash
-python -m src.train --model mobilenet_v2 --optimizer adam --lr 1e-4 --img-size 128 --epochs 5 --run-name final_mobilenet_v2
-python -m src.evaluate --model mobilenet_v2 --checkpoint outputs/final_mobilenet_v2/best_model.pt --img-size 128
-python -m src.plot_history --run-dir outputs/final_mobilenet_v2
-
-python -m src.train --model efficientnet_b0 --optimizer adam --lr 1e-4 --img-size 64 --epochs 5 --run-name final_efficientnet_b0
-python -m src.evaluate --model efficientnet_b0 --checkpoint outputs/final_efficientnet_b0/best_model.pt --img-size 64
-python -m src.plot_history --run-dir outputs/final_efficientnet_b0
-```
-
 ## How to run
 
 Install dependencies:
@@ -279,87 +246,67 @@ python -m src.evaluate --model b --checkpoint outputs/modelb_adam/best_model.pt
 Evaluation writes `metrics.json` and `confusion_matrix.png` into the
 checkpoint's output directory.
 
-### Hardware Profiling & MAC/FLOP Benchmarking:
+## Submission checklist
 
-Profile theoretical Multiply-Accumulate operations (MACs), FLOPs, single-image latency (ms), and throughput across all architectures:
+1. Run the notebook on Kaggle/Colab after pulling the branch containing the
+   final code.
+2. Download and preserve the generated `final_a_adam` and compliant
+   64x64 MobileNetV2 artifacts.
+3. Compile `report/main.tex`, inspect all figures and tables, and rename the
+   final PDF using the required Moodle filename format.
 
-```bash
-# Benchmark on CPU
-python -m src.benchmark --device cpu --runs 100
+## Resolution and benchmark policy
 
-# Benchmark on GPU (if available)
-python -m src.benchmark --device cuda --runs 100 --batch-size 1
-```
+The assignment permits a maximum image resolution of 64x64. The shared
+`validate_image_size` guard enforces this limit across training,
+preprocessing, prediction, export, and benchmark entry points. The notebook
+now schedules MobileNetV2 at 64x64 for the compliant run. The historical
+128x128 MobileNetV2 result is retained only as an optional resolution study
+and must not be presented as the compliant final result.
 
-### Single-Image Inference CLI:
+The benchmark uses synthetic inputs and newly initialized models. Its MAC
+values are theoretical convolution/linear estimates, and its latency values
+are indicative software measurements rather than physical edge-device
+performance.
 
-Classify any satellite image with top-K class confidences and visual bars:
+## Reproducing and recording results
 
-```bash
-python -m src.predict --image path/to/sample.jpg --checkpoint outputs/modelb_adam/best_model.pt --model b --top-k 3
-```
+The notebook `notebooks/EN3150_A03_kaggle_colab.ipynb` clones the repository,
+runs the custom 20-epoch experiments, evaluates the two pretrained models,
+generates plots and confusion matrices, and writes `outputs/all_results.csv`.
+Run it on Kaggle or Colab with a T4/P100 GPU and Internet enabled. Save and
+download the generated `outputs/` directory, including `final_a_adam`, before
+comparing the report with the local checkout. The notebook has been reset to
+clear stale outputs before rerunning; its 64x64 MobileNetV2 run must produce
+a new result rather than reusing the historical 128x128 result.
 
-### Edge Deployment Export (TorchScript & ONNX):
-
-Export trained PyTorch checkpoints to portable edge formats with numerical parity checks:
-
-```bash
-# Export Model B to TorchScript and ONNX
-python -m src.export --model b --checkpoint outputs/modelb_adam/best_model.pt
-
-# Export all custom models
-python -m src.export --all
-```
-
-### Dataset Verification & Statistical Profiling:
-
-Verify dataset integrity, image resolutions (64x64), class balance, and stratified split counts (70/15/15):
-
-```bash
-# Verify dataset and export statistical markdown profile
-python -m src.data.verify_dataset --export-md docs/DATASET.md
-```
-
-### Running Automated Unit Tests & Continuous Integration (CI):
-
-Run the test suite verifying Model B's $\le 100,000$ parameter budget, output tensor shapes, MAC calculations, inference pipeline, edge export parity, and dataset splits:
+The local unit-test suite is run with:
 
 ```bash
-python -m unittest discover tests
+python -m unittest discover -s tests
 ```
 
-*Note: Automated CI is configured via `.github/workflows/ci.yml` to run the full test suite and CPU benchmark verification across Python 3.11 and 3.12 on every push and pull request.*
+Latest local validation on `assignment-compliance-sync`:
 
-## Cloud Execution (Kaggle / Colab)
+```text
+Ran 15 tests in 1.733s
+OK (skipped=1)
+```
 
-A self-contained notebook is available at `notebooks/EN3150_A03_kaggle_colab.ipynb` to run all experiments (Model A, Model B with 3 optimizers, MobileNetV2, EfficientNet-B0, evaluation, plots, and comparison tables) under a single GPU for consistent benchmark timings.
-
-### Running on Kaggle:
-1. Open Kaggle -> **Create -> New Notebook -> File -> Import Notebook** and select `notebooks/EN3150_A03_kaggle_colab.ipynb`.
-2. In the right panel (**Session options**):
-   - **Accelerator**: Set to **GPU T4 x2** (or P100).
-   - **Internet**: Toggle **On** (requires phone verification on Kaggle).
-3. Click **Run All** (or **Save Version -> Save & Run All (Commit)** to execute headlessly in the background).
-4. After completion, download `results.zip` from the notebook's **Output** tab and extract into `outputs/`.
-
-## Work remaining before submission
-
-The following tasks are completed and remaining:
-
-- [x] **Re-run benchmarks on unified hardware**: Completed on Tesla T4 GPU.
-- [x] **Include outputs & artifacts**: Checkpoints, loss curves, confusion matrices, and metrics present in `outputs/`.
-- [x] **Report tables & figures update**: `report/main.tex` updated with Tesla T4 metrics and plots.
-- [x] **Hardware profiling & CLI tools**: Added `src/benchmark.py`, `src/predict.py`, and test suite.
-- [x] **Edge Deployment Export**: Added `src/export.py` supporting TorchScript & ONNX with numerical parity verification.
-- [x] **CI & Dataset Profiling**: Added GitHub Actions CI workflow (`.github/workflows/ci.yml`) and dataset verification tool (`src/data/verify_dataset.py`).
-- [ ] **Author Details (`report/main.tex`)**: Fill in group member names, index numbers, and university emails (lines 21–22).
-- [ ] **Dataset Sheet**: Confirm that the dataset information sheet referenced in the assignment brief has been filled in, and remove the `\todofill` note on line 64.
-- [ ] **Final Submission**:
-  - Compile `report/main.tex` to PDF (e.g. via Overleaf).
-  - Package code and report separately according to course guidelines (`GroupNo_A03_EN3150`).
+The skipped test requires optional ONNX runtime support. The full notebook
+rerun was not executed in this Windows checkout because the configured
+`archive\EuroSAT` path is absent and the notebook requires a Kaggle/Colab GPU
+for the complete 20-epoch custom and 5-epoch SOTA experiments. The notebook
+has been reset to a clean state and pushed to this branch; run all cells on
+Kaggle/Colab, then download and preserve the generated result files.
 
 ## Important notes
 
 - The dataset split is generated deterministically using seed 42.
-- Model B's parameter budget (<= 100,000 parameters) is strictly enforced with an assertion in the model constructor.
-- Regular Git commits are required by the module instructors to demonstrate project progress over time.
+- Model B's parameter budget is enforced with an assertion in the model
+  constructor.
+- Existing output files are currently generated artifacts and should be
+  intentionally included in version control if they are required for
+  submission.
+- No pretrained SOTA model implementation or final report is currently
+  included.

@@ -4,9 +4,22 @@ import unittest
 from src.models.model_a import ModelA
 from src.models.model_b import ModelB
 from src.benchmark import compute_macs_and_flops
+from src.config import IMAGE_SIZE, MAX_IMAGE_SIZE, validate_image_size
+from src.data.dataset import build_transforms
 
 
 class TestBenchmarkProfiler(unittest.TestCase):
+
+    def test_assignment_maximum_resolution_is_enforced(self):
+        self.assertEqual(IMAGE_SIZE, 64)
+        self.assertEqual(MAX_IMAGE_SIZE, 64)
+        self.assertEqual(validate_image_size(64), 64)
+        with self.assertRaises(ValueError):
+            validate_image_size(65)
+
+    def test_resize_pipeline_rejects_resolution_above_assignment_limit(self):
+        with self.assertRaises(ValueError):
+            build_transforms(65, (0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 
     def test_model_a_macs(self):
         """Model A MAC count should be approximately 11.73 M-MACs."""

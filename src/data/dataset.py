@@ -2,13 +2,22 @@ from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 from sklearn.model_selection import train_test_split
 
-from src.config import BATCH_SIZE, DATA_DIR, IMAGE_SIZE, SEED, TEST_SPLIT, TRAIN_SPLIT
+from src.config import (
+    BATCH_SIZE,
+    DATA_DIR,
+    IMAGE_SIZE,
+    SEED,
+    TEST_SPLIT,
+    TRAIN_SPLIT,
+    validate_image_size,
+)
 
 NORM_MEAN = (0.5, 0.5, 0.5)
 NORM_STD = (0.5, 0.5, 0.5)
 
 
 def build_transforms(image_size: int, mean, std):
+    validate_image_size(image_size)
     train = transforms.Compose(
         [
             transforms.Resize((image_size, image_size)),

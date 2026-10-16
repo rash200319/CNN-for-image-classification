@@ -90,7 +90,22 @@ class TestModelArchitectures(unittest.TestCase):
             self.assertEqual(out.shape, (2, self.num_classes),
                              f"{model_name} output shape mismatch: expected (2, {self.num_classes}), got {out.shape}")
 
+    def test_pretrained_models_support_assignment_resolution(self):
+        """Test pretrained models can classify the assignment-compliant 64x64 input."""
+        for model_name in PRETRAINED_MODELS:
+            model = build_pretrained(model_name, num_classes=self.num_classes)
+            model.eval()
+            dummy_input = torch.randn(2, 3, self.img_size, self.img_size)
+
+            with torch.no_grad():
+                out = model(dummy_input)
+
+            self.assertEqual(
+                out.shape,
+                (2, self.num_classes),
+                f"{model_name} must support 64x64 inputs; got output shape {out.shape}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
-
