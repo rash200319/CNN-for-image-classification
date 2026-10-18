@@ -1,15 +1,12 @@
-# EuroSAT RGB Dataset Specification & Verification Profile
-
-This document details the dataset preparation and statistical verification for **EN3150 Assignment 03: Resource-Constrained CNN for Edge Image Classification**.
+# EuroSAT RGB Dataset Profile
 
 ## 1. Overview
-- **Dataset Name**: EuroSAT (RGB Variant, Sentinel-2 Satellite Imagery)
-- **Source Platform**: European Space Agency (ESA) Copernicus Sentinel-2 / Zenodo
+- **Dataset Name**: EuroSAT (RGB)
 - **Total Images**: 27,000
 - **Number of Classes**: 10
-- **Native Spatial Resolution**: 64 x 64 pixels (Satisfies the $\le 64 \times 64$ constraint)
+- **Spatial Resolution**: 64 x 64 pixels (`MAX_IMAGE_SIZE = 64`)
 - **Color Channels**: 3 (RGB)
-- **Reproducibility Seed**: 42
+- **Split Seed**: 42
 
 ## 2. Per-Class Sample Distribution
 | Class Name | Sample Count | Percentage (%) |
@@ -33,9 +30,17 @@ This document details the dataset preparation and statistical verification for *
 | Validation | 15% | 4,049 | 15.00% |
 | Testing | 15% | 4,051 | 15.00% |
 
-## 4. Channel-Wise Pixel Normalization Statistics
-Empirically computed over RGB normalized space $[0.0, 1.0]$:
+## 4. Channel-Wise Pixel Statistics (`[0.0, 1.0]`)
 - **Mean (R, G, B)**: `[0.3412, 0.3787, 0.4054]`
 - **Standard Deviation (R, G, B)**: `[0.0924, 0.0659, 0.0561]`
 
-*Note: Custom models (Model A and Model B) use standard $(0.5, 0.5, 0.5)$ centering mapping inputs to $[-1.0, 1.0]$, while fine-tuned SOTA models use canonical ImageNet statistics.*
+## 5. Resolution Audit Output (`outputs/dataset_resolution_audit.txt`)
+```text
+Dataset: archive/EuroSAT
+Total image files: 27000
+Resolution counts:
+  64 x 64: 27000 images
+Maximum resolution: 64 x 64
+Unreadable files: 0
+PASS: All images satisfy the maximum 64 x 64 requirement.
+```
