@@ -1,195 +1,195 @@
 # Resource-Constrained CNN for Edge Image Classification
 
-This repository contains the implementation for the EN3150 Assignment 03
-resource-constrained image-classification task.
-
-## Current completion status
-
-All custom CNN architectures, optimizer comparisons, 64x64 SOTA fine-tunes,
-hardware benchmarks, edge exports, and the final written report (`report/main.tex`
-and `report/main.pdf`) are **100% complete** and synchronized.
-
-| Area | Status |
-|---|---|
-| EuroSAT dataset and preprocessing | Complete |
-| 70/15/15 stratified data split | Complete |
-| 64x64 maximum-resolution enforcement | Complete (code-level via `validate_image_size` & dataset audit) |
-| Model A standard CNN | Complete (549,290 params) |
-| Model B depthwise-separable CNN | Complete (13,288 params, $\le 100,000$ budget) |
-| Model A Adam training (64x64) | Complete (**90.03%**, Tesla T4) |
-| Model B Adam training (64x64) | Complete (**91.01%**, Tesla T4) |
-| SGD and SGD-with-Momentum comparison | Complete for Model B (**79.88%** vs. **89.90%**, Tesla T4) |
-| Test evaluation and confusion matrices | Complete for all runs |
-| Training/validation loss plots | Complete for all runs |
-| MobileNetV2 (64x64, compliant) | Complete (**97.58%**, Tesla T4) |
-| EfficientNet-B0 (64x64, compliant) | Complete (**97.36%**, Tesla T4) |
-| Author details, dataset sheet confirmation | Complete |
-| Final written report (`report/main.tex` & `report/main.pdf`) | Complete |
+Implementation and experimental outputs for EN3150 Assignment 03.
 
 ## Dataset
 
-The project uses the RGB version of the EuroSAT dataset. It is stored locally
-under `archive/EuroSAT` (see `src/config.py`).
+- **Dataset**: EuroSAT (RGB)
+- **Path**: `archive/EuroSAT` (configured in `src/config.py`)
+- **Total images**: 27,000
+- **Classes**: 10 (`AnnualCrop`, `Forest`, `HerbaceousVegetation`, `Highway`, `Industrial`, `Pasture`, `PermanentCrop`, `Residential`, `River`, `SeaLake`)
+- **Image resolution**: `64 x 64` pixels (`MAX_IMAGE_SIZE = 64`)
+- **Split ratios**: 70% training (`18,900`), 15% validation (`4,049`), 15% testing (`4,051`)
+- **Split method**: Stratified split (`SEED = 42`)
 
-- Images: 27,000
-- Classes: 10
-- Image resolution: 64x64 pixels
-- Training split: 18,900 images
-- Validation split: 4,049 images
-- Test split: 4,051 images
-- Split method: stratified split with random seed 42
+### Dataset Resolution Audit (`outputs/dataset_resolution_audit.txt`)
 
-The small rounding difference in the split counts is due to integer sample
-allocation. Images are resized to 64x64 by the data pipeline. Training, prediction,
-export, and benchmarking reject requested sizes above 64x64.
-
-### Portable dataset-resolution audit
-
-The repository includes a full-dataset audit that does not assume a
-machine-specific path. It scans every supported image, reports the resolution
-distribution, and fails if an image is larger than the assignment maximum:
-
-```bash
-python tests/test_dataset_resolution.py --dataset-dir /path/to/EuroSAT
+```text
+Dataset: archive/EuroSAT
+Total image files: 27000
+Resolution counts:
+  64 x 64: 27000 images
+Maximum resolution: 64 x 64
+Unreadable files: 0
+PASS: All images satisfy the maximum 64 x 64 requirement.
 ```
 
-The dataset location can also be supplied through `EUROSAT_DIR`:
-
-```bash
-EUROSAT_DIR=/path/to/EuroSAT python tests/test_dataset_resolution.py
-```
-
-On Windows PowerShell:
-
-```powershell
-$env:EUROSAT_DIR = "D:\datasets\EuroSAT"
-python tests/test_dataset_resolution.py
-```
-
-For the RGB EuroSAT dataset, the verified result (`outputs/dataset_resolution_audit.txt`)
-is 27,000 images at 64x64 with 0 unreadable files (`PASS`).
-
-Classes:
-
-1. AnnualCrop
-2. Forest
-3. HerbaceousVegetation
-4. Highway
-5. Industrial
-6. Pasture
-7. PermanentCrop
-8. Residential
-9. River
-10. SeaLake
-
-## Project structure
+## Project Structure
 
 ```text
 src/
-  config.py                  Dataset/training config; MAX_IMAGE_SIZE=64 enforcement
-  data/dataset.py            Dataset loading, augmentation, and splitting
-  data/verify_dataset.py     Dataset verification and statistical profiling tool
-  models/model_a.py          Standard convolutional CNN (549k params)
-  models/model_b.py          Lightweight depthwise-separable CNN (13k params)
-  models/blocks.py           Reusable depthwise-separable conv block
-  models/pretrained.py       ImageNet backbones (MobileNetV2, EfficientNet-B0)
-  train.py                   Training entry point (--img-size capped at 64)
-  evaluate.py                Test metrics and confusion-matrix generation
-  benchmark.py               Hardware latency, peak memory, and MAC/FLOP profiler
-  predict.py                 Single-image and batch land-use inference CLI
-  export.py                  Edge deployment exporter (TorchScript & ONNX) with parity checks
-  plot_history.py            Training/validation curve generator
-  compare_runs.py            Comparison table aggregator across runs
-  utils.py                   Shared parameter counting and helper utilities
+  config.py                      Dataset and training configuration (MAX_IMAGE_SIZE = 64)
+  data/dataset.py                Dataset loading, transforms, and stratified splitting
+  data/verify_dataset.py         Dataset statistical profiling tool
+  models/model_a.py              Model A architecture (standard 2D CNN)
+  models/model_b.py              Model B architecture (depthwise-separable CNN)
+  models/blocks.py               Depthwise-separable convolution block
+  models/pretrained.py           Pretrained MobileNetV2 and EfficientNet-B0 builders
+  train.py                       Model training CLI
+  evaluate.py                    Test evaluation and confusion matrix CLI
+  benchmark.py                   MAC/FLOP and latency profiler CLI
+  predict.py                     Single-image and batch inference CLI
+  export.py                      TorchScript and ONNX exporter CLI
+  plot_history.py                Loss and accuracy curve plotting CLI
+  compare_runs.py                Run comparison table CLI
+  utils.py                       Parameter counting utilities
 tests/
-  test_models.py             Architecture budget and tensor shape assertions
-  test_benchmark.py          MAC/FLOP calculation assertions
-  test_predict.py            Inference pipeline validation
-  test_export.py             TorchScript and ONNX export parity assertions
-  test_dataset_verification.py  Dataset split distribution assertions
-  test_dataset_resolution.py Portable full-dataset resolution audit
+  test_models.py                 Architecture parameter budget and shape tests
+  test_benchmark.py              MAC/FLOP and resolution validation tests
+  test_predict.py                Inference pipeline tests
+  test_export.py                 TorchScript and ONNX export tests
+  test_dataset_verification.py   Dataset split ratio tests
+  test_dataset_resolution.py     Dataset resolution audit and unit tests
 docs/
-  DATASET.md                 EuroSAT statistical profile and class breakdown
+  DATASET.md                     EuroSAT dataset statistical profile
 .github/workflows/
-  ci.yml                     CI: runs the test suite on Python 3.11 & 3.12
+  ci.yml                         GitHub Actions test workflow (Python 3.11 & 3.12)
 notebooks/
-  EN3150_A03_kaggle_colab.ipynb  Executed cloud GPU training run (Model A/B, SOTA, plots)
-outputs/                     Checkpoints, config.json, metrics.json, history.csv, plots per run
-report/                      LaTeX source (main.tex), figures/, and main.pdf
+  EN3150_A03_kaggle_colab.ipynb  Executed Kaggle Tesla T4 notebook
+outputs/                         Recorded checkpoints, configs, metrics, CSVs, and plots
+report/                          LaTeX source (main.tex), figures/, and compiled main.pdf
 ```
 
-## Custom CNNs
+## Model Architectures
 
-### Model A: Standard CNN
-
-Model A uses regular 2D convolutions:
+### Model A (Standard CNN)
 
 ```text
 Input: 3 x 64 x 64
-Conv2D(3 -> 16, 3x3) -> ReLU -> MaxPool(2x2)
-Conv2D(16 -> 32, 3x3) -> ReLU -> MaxPool(2x2)
-Conv2D(32 -> 64, 3x3) -> ReLU -> MaxPool(2x2)
-Flatten
-Linear(64*8*8 -> 128) -> ReLU
+Conv2D(3 -> 16, 3x3, pad=1) -> ReLU -> MaxPool2D(2x2)
+Conv2D(16 -> 32, 3x3, pad=1) -> ReLU -> MaxPool2D(2x2)
+Conv2D(32 -> 64, 3x3, pad=1) -> ReLU -> MaxPool2D(2x2)
+Flatten (64 * 8 * 8 = 4096)
+Linear(4096 -> 128) -> ReLU
 Linear(128 -> 10)
 ```
 
-Verified trainable parameter count: **549,290**.
+- **Trainable parameters**: `549,290`
 
-### Model B: Lightweight CNN
-
-Model B replaces regular convolutions with depthwise-separable convolutions
-and uses global average pooling:
+### Model B (Depthwise-Separable CNN)
 
 ```text
 Input: 3 x 64 x 64
-DepthwiseSeparableConv(3 -> 32, 3x3) -> MaxPool(2x2)
-DepthwiseSeparableConv(32 -> 64, 3x3) -> MaxPool(2x2)
-DepthwiseSeparableConv(64 -> 128, 3x3) -> MaxPool(2x2)
-Adaptive Global Average Pooling
+DepthwiseSeparableConv(3 -> 32, 3x3, pad=1) -> MaxPool2D(2x2)
+DepthwiseSeparableConv(32 -> 64, 3x3, pad=1) -> MaxPool2D(2x2)
+DepthwiseSeparableConv(64 -> 128, 3x3, pad=1) -> MaxPool2D(2x2)
+AdaptiveAvgPool2D(1x1)
 Linear(128 -> 10)
 ```
 
-Verified trainable parameter count: **13,288**.
+- **Trainable parameters**: `13,288` (`MODEL_B_MAX_PARAMS = 100,000`)
 
-This is below the assignment limit of 100,000 trainable parameters. ReLU is
-used because it is inexpensive on edge hardware and avoids the exponential
-operations required by sigmoid or tanh.
+### Pretrained Models
 
-## Training & Evaluation Results (Tesla T4 GPU, `64x64`, `seed=42`)
+- **MobileNetV2**: `2,236,682` trainable parameters (`input = 3 x 64 x 64`)
+- **EfficientNet-B0**: `4,020,358` trainable parameters (`input = 3 x 64 x 64`)
 
-**All results below are synchronized across `outputs/`, `notebooks/EN3150_A03_kaggle_colab.ipynb`, and `report/main.tex` (`report/main.pdf`).** Both Model A and Model B were trained for 20 epochs with Adam (`lr=1e-3`) unless noted otherwise.
+## Recorded Experimental Outputs
 
-| Model | Parameters | Checkpoint size | Median time/epoch (T4 GPU) | Test accuracy |
-|---|---:|---:|---:|---:|
-| Model A (`final_a_adam`) | 549,290 | 2,150.1 KB | 8.53 s | 90.03% |
-| Model B (`modelb_adam`) | 13,288 | 63.9 KB | 8.66 s | **91.01%** |
+### Training Environment (`outputs/*/config.json`)
 
-Model B optimizer comparison (20 epochs each, Tesla T4 GPU):
+- **Device**: `cuda` (Tesla T4)
+- **Input size**: `64 x 64`
+- **Seed**: `42`
+- **PyTorch version**: `2.11.0+cu128`
+- **NumPy version**: `2.1.3`
 
-| Run | Test accuracy | Macro precision | Macro recall | Macro F1 |
-|---|---:|---:|---:|---:|
-| Model B + Adam (`modelb_adam`) | **91.01%** | 0.9087 | 0.9064 | 0.9067 |
-| Model B + SGD (`modelb_sgd`) | 79.88% | 0.7967 | 0.7879 | 0.7833 |
-| Model B + SGD + momentum 0.9 (`modelb_sgd_momentum`) | 89.90% | 0.8963 | 0.8968 | 0.8957 |
+### Overall Run Summary (`outputs/all_results.csv`)
 
-Adam and SGD+momentum (same `lr=1e-2` as plain SGD, isolating momentum's
-effect) both substantially outperform plain SGD (+10.02 percentage points for
-momentum). Model B uses 97.6% fewer trainable parameters than Model A while
-outperforming it by 0.98 percentage points on the test set thanks to batch
-normalization and global average pooling.
+| Run | Model | Optimizer | LR | Momentum | Epochs | Params | Size (KB) | Size (MB) | Median Time/Epoch (s) | Best Val Acc (%) | Test Acc (%) | Precision (Macro) | Recall (Macro) | F1 (Macro) |
+|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `final_a_adam` | `a` | `adam` | `0.001` | `0.9` | 20 | 549,290 | 2150.1 | 2.100 | 8.53 | 89.40 | 90.03 | 0.9020 | 0.8946 | 0.8964 |
+| `modelb_adam` | `b` | `adam` | `0.001` | `0.9` | 20 | 13,288 | 63.9 | 0.062 | 8.66 | 91.08 | 91.01 | 0.9087 | 0.9064 | 0.9067 |
+| `modelb_sgd` | `b` | `sgd` | `0.01` | `0.9` | 20 | 13,288 | 63.9 | 0.062 | 8.42 | 79.82 | 79.88 | 0.7967 | 0.7879 | 0.7833 |
+| `modelb_sgd_momentum` | `b` | `sgd_momentum` | `0.01` | `0.9` | 20 | 13,288 | 63.9 | 0.062 | 8.56 | 89.08 | 89.90 | 0.8963 | 0.8968 | 0.8957 |
+| `final_mobilenet_v2` | `mobilenet_v2` | `adam` | `0.0001` | `0.9` | 5 | 2,236,682 | 8976.9 | 8.766 | 12.45 | 97.38 | 97.58 | 0.9752 | 0.9743 | 0.9747 |
+| `final_efficientnet_b0` | `efficientnet_b0` | `adam` | `0.0001` | `0.9` | 5 | 4,020,358 | 15997.0 | 15.622 | 16.39 | 96.99 | 97.36 | 0.9732 | 0.9721 | 0.9726 |
 
-## SOTA fine-tuning (MobileNetV2 and EfficientNet-B0 at `64x64`)
+### Per-Class Test Metrics (`outputs/*/metrics.json`)
 
-Two ImageNet-pretrained models were fine-tuned end-to-end on the same splits at
-the assignment-compliant `64x64` resolution, 5 epochs each, Adam (`lr=1e-4`):
+#### Custom Models (`final_a_adam` and `modelb_adam`)
 
-| Model | Input | Params | Size (MB) | MACs (M) | Median time/epoch (T4) | Test accuracy | Macro P / R |
+| Class | Support | `final_a_adam` Precision | `final_a_adam` Recall | `final_a_adam` F1 | `modelb_adam` Precision | `modelb_adam` Recall | `modelb_adam` F1 |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| MobileNetV2 (`final_mobilenet_v2`) | 64x64 | 2,236,682 | 8.77 | 24.46 | 12.45 s | **97.58%** | 0.975 / 0.974 |
-| EfficientNet-B0 (`final_efficientnet_b0`) | 64x64 | 4,020,358 | 15.62 | 31.98 | 16.39 s | **97.36%** | 0.973 / 0.972 |
+| AnnualCrop | 450 | 0.8848 | 0.9044 | 0.8945 | 0.8796 | 0.9089 | 0.8940 |
+| Forest | 450 | 0.9231 | 0.9867 | 0.9538 | 0.9713 | 0.9778 | 0.9745 |
+| HerbaceousVegetation | 451 | 0.8571 | 0.8780 | 0.8675 | 0.8580 | 0.9246 | 0.8901 |
+| Highway | 375 | 0.9402 | 0.7547 | 0.8373 | 0.9250 | 0.7893 | 0.8518 |
+| Industrial | 375 | 0.9267 | 0.9440 | 0.9353 | 0.9082 | 0.9760 | 0.9409 |
+| Pasture | 300 | 0.9502 | 0.8267 | 0.8841 | 0.9033 | 0.9033 | 0.9033 |
+| PermanentCrop | 375 | 0.8306 | 0.8240 | 0.8273 | 0.8228 | 0.8293 | 0.8260 |
+| Residential | 450 | 0.9194 | 0.9889 | 0.9529 | 0.9752 | 0.9622 | 0.9687 |
+| River | 375 | 0.8133 | 0.8827 | 0.8465 | 0.8533 | 0.8373 | 0.8452 |
+| SeaLake | 450 | 0.9751 | 0.9556 | 0.9652 | 0.9908 | 0.9556 | 0.9729 |
 
-## How to run
+#### Model B SGD Variants (`modelb_sgd` and `modelb_sgd_momentum`)
+
+| Class | Support | `modelb_sgd` Precision | `modelb_sgd` Recall | `modelb_sgd` F1 | `modelb_sgd_momentum` Precision | `modelb_sgd_momentum` Recall | `modelb_sgd_momentum` F1 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| AnnualCrop | 450 | 0.8676 | 0.8156 | 0.8408 | 0.8568 | 0.9178 | 0.8863 |
+| Forest | 450 | 0.8521 | 0.9733 | 0.9087 | 0.9567 | 0.9822 | 0.9693 |
+| HerbaceousVegetation | 451 | 0.6362 | 0.9113 | 0.7493 | 0.9152 | 0.8137 | 0.8615 |
+| Highway | 375 | 0.6571 | 0.5520 | 0.6000 | 0.8051 | 0.8480 | 0.8260 |
+| Industrial | 375 | 0.8476 | 0.9493 | 0.8956 | 0.9030 | 0.9680 | 0.9344 |
+| Pasture | 300 | 0.7508 | 0.8133 | 0.7808 | 0.8954 | 0.9133 | 0.9043 |
+| PermanentCrop | 375 | 0.7000 | 0.5413 | 0.6105 | 0.8189 | 0.8320 | 0.8254 |
+| Residential | 450 | 0.9036 | 0.9578 | 0.9299 | 0.9905 | 0.9289 | 0.9587 |
+| River | 375 | 0.7857 | 0.4693 | 0.5876 | 0.8547 | 0.7840 | 0.8178 |
+| SeaLake | 450 | 0.9664 | 0.8956 | 0.9296 | 0.9671 | 0.9800 | 0.9735 |
+
+#### Pretrained Models (`final_mobilenet_v2` and `final_efficientnet_b0`)
+
+| Class | Support | `final_mobilenet_v2` Precision | `final_mobilenet_v2` Recall | `final_mobilenet_v2` F1 | `final_efficientnet_b0` Precision | `final_efficientnet_b0` Recall | `final_efficientnet_b0` F1 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| AnnualCrop | 450 | 0.9524 | 0.9778 | 0.9649 | 0.9581 | 0.9667 | 0.9624 |
+| Forest | 450 | 0.9912 | 0.9956 | 0.9933 | 0.9890 | 0.9956 | 0.9922 |
+| HerbaceousVegetation | 451 | 0.9649 | 0.9756 | 0.9702 | 0.9465 | 0.9800 | 0.9630 |
+| Highway | 375 | 0.9753 | 0.9467 | 0.9608 | 0.9653 | 0.9653 | 0.9653 |
+| Industrial | 375 | 0.9946 | 0.9813 | 0.9879 | 0.9867 | 0.9867 | 0.9867 |
+| Pasture | 300 | 0.9567 | 0.9567 | 0.9567 | 0.9596 | 0.9500 | 0.9548 |
+| PermanentCrop | 375 | 0.9592 | 0.9413 | 0.9502 | 0.9617 | 0.9387 | 0.9501 |
+| Residential | 450 | 0.9890 | 0.9978 | 0.9934 | 0.9889 | 0.9889 | 0.9889 |
+| River | 375 | 0.9735 | 0.9813 | 0.9774 | 0.9783 | 0.9627 | 0.9704 |
+| SeaLake | 450 | 0.9955 | 0.9889 | 0.9922 | 0.9978 | 0.9867 | 0.9922 |
+
+### Synthetic-Input Benchmark Outputs (`outputs/benchmark_gpu.csv` & `outputs/benchmark_cpu.csv`)
+
+#### GPU (`CUDA`)
+
+| Model | Input Shape | Parameters | MACs (M) | FLOPs (M) | Latency (ms/img) | Throughput (img/s) | Device | Measurement |
+|---|---|---:|---:|---:|---:|---:|---|---|
+| Model A (Standard CNN) | `3x64x64` | 549,290 | 11.73 | 23.46 | 0.411 | 2434.3 | CUDA | synthetic input, untrained model |
+| Model B (Depthwise-Sep. CNN) | `3x64x64` | 13,288 | 5.14 | 10.28 | 0.616 | 1624.2 | CUDA | synthetic input, untrained model |
+| MobileNetV2 (Pretrained) | `3x64x64` | 2,236,682 | 24.46 | 48.92 | 4.924 | 203.1 | CUDA | synthetic input, untrained model |
+| EfficientNet-B0 (Pretrained) | `3x64x64` | 4,020,358 | 31.98 | 63.96 | 7.588 | 131.8 | CUDA | synthetic input, untrained model |
+
+#### CPU (`CPU`)
+
+| Model | Input Shape | Parameters | MACs (M) | FLOPs (M) | Latency (ms/img) | Throughput (img/s) | Device | Measurement |
+|---|---|---:|---:|---:|---:|---:|---|---|
+| Model A (Standard CNN) | `3x64x64` | 549,290 | 11.73 | 23.46 | 1.203 | 831.5 | CPU | synthetic input, untrained model |
+| Model B (Depthwise-Sep. CNN) | `3x64x64` | 13,288 | 5.14 | 10.28 | 2.399 | 416.8 | CPU | synthetic input, untrained model |
+| MobileNetV2 (Pretrained) | `3x64x64` | 2,236,682 | 24.46 | 48.92 | 7.695 | 130.0 | CPU | synthetic input, untrained model |
+| EfficientNet-B0 (Pretrained) | `3x64x64` | 4,020,358 | 31.98 | 63.96 | 10.863 | 92.1 | CPU | synthetic input, untrained model |
+
+### Edge Export Outputs (`outputs/edge_export_report.txt`)
+
+| Model | Checkpoint | Input Shape | Params | PyTorch (KB) | TorchScript (KB) | TorchScript Max Abs Diff | ONNX Graph (KB) | ONNX Max Abs Diff |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| `A` | `outputs/final_a_adam/best_model.pt` | `3x64x64` | 549,290 | 2150.1 | 2171.7 | `0.00e+00` | 19.4 | `7.63e-06` |
+| `B` | `outputs/modelb_adam/best_model.pt` | `3x64x64` | 13,288 | 63.9 | 92.6 | `0.00e+00` | 26.7 | `9.16e-05` |
+
+## Commands
 
 Install dependencies:
 
@@ -197,45 +197,38 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Run Model A with Adam:
+Train models:
 
 ```bash
 python -m src.train --model a --optimizer adam --lr 1e-3 --epochs 20 --run-name final_a_adam
-```
-
-Run Model B with Adam:
-
-```bash
 python -m src.train --model b --optimizer adam --lr 1e-3 --epochs 20 --run-name modelb_adam
-```
-
-Run plain SGD:
-
-```bash
 python -m src.train --model b --optimizer sgd --lr 1e-2 --epochs 20 --run-name modelb_sgd
-```
-
-Run SGD with Momentum:
-
-```bash
 python -m src.train --model b --optimizer sgd_momentum --lr 1e-2 --momentum 0.9 --epochs 20 --run-name modelb_sgd_momentum
-```
-
-Fine-tune SOTA models at 64x64:
-
-```bash
 python -m src.train --model mobilenet_v2 --optimizer adam --lr 1e-4 --img-size 64 --epochs 5 --run-name final_mobilenet_v2
 python -m src.train --model efficientnet_b0 --optimizer adam --lr 1e-4 --img-size 64 --epochs 5 --run-name final_efficientnet_b0
 ```
 
-Evaluate a trained checkpoint:
+Evaluate checkpoints and plot curves:
 
 ```bash
-python -m src.evaluate --model b --checkpoint outputs/modelb_adam/best_model.pt
+python -m src.evaluate --model a --checkpoint outputs/final_a_adam/best_model.pt --img-size 64
+python -m src.evaluate --model b --checkpoint outputs/modelb_adam/best_model.pt --img-size 64
+python -m src.evaluate --model b --checkpoint outputs/modelb_sgd/best_model.pt --img-size 64
+python -m src.evaluate --model b --checkpoint outputs/modelb_sgd_momentum/best_model.pt --img-size 64
+python -m src.evaluate --model mobilenet_v2 --checkpoint outputs/final_mobilenet_v2/best_model.pt --img-size 64
+python -m src.evaluate --model efficientnet_b0 --checkpoint outputs/final_efficientnet_b0/best_model.pt --img-size 64
+python -m src.plot_history --run-dir outputs/final_a_adam
+python -m src.plot_history --run-dir outputs/modelb_adam
 ```
 
-Run the unit-test suite:
+Run benchmarks, exports, dataset verification, and unit tests:
 
 ```bash
+python -m src.benchmark --device cuda --runs 200 --out outputs/benchmark_gpu.csv
+python -m src.benchmark --device cpu --runs 100 --out outputs/benchmark_cpu.csv
+python -m src.export --model a --checkpoint outputs/final_a_adam/best_model.pt
+python -m src.export --model b --checkpoint outputs/modelb_adam/best_model.pt
+python -m src.data.verify_dataset --export-md docs/DATASET.md
+python tests/test_dataset_resolution.py --dataset-dir archive/EuroSAT
 python -m unittest discover -s tests -v
 ```
