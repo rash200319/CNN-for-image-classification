@@ -1,10 +1,7 @@
 """Synthetic-input architecture benchmarking tool.
 
-Computes:
-1. Theoretical multiply-accumulate operations (MACs) and floating-point operations (FLOPs).
-2. Single-image and batch inference latency (milliseconds).
-3. Throughput (frames / images per second).
-4. Peak memory allocation during forward pass.
+Computes theoretical MACs/FLOPs, inference latency, and throughput across
+Model A, Model B, MobileNetV2, and EfficientNet-B0.
 
 The latency and throughput values use newly initialized models and synthetic
 inputs. They are indicative software measurements, not trained-checkpoint or
@@ -25,10 +22,10 @@ import pandas as pd
 import torch
 import torch.nn as nn
 
+from src.config import IMAGE_SIZE
 from src.models.model_a import ModelA
 from src.models.model_b import ModelB
-from src.models.pretrained import PRETRAINED_MODELS, build_pretrained
-from src.config import IMAGE_SIZE
+from src.models.pretrained import build_pretrained
 from src.utils import count_parameters
 
 
@@ -43,7 +40,7 @@ def compute_macs_and_flops(model: nn.Module, input_size: Tuple[int, int]) -> Tup
         in_c = module.in_channels
         out_c = module.out_channels
         groups = module.groups
-        macs = (kernel_h * kernel_w * (in_c // groups) * out_c * output_h * output_w)
+        macs = kernel_h * kernel_w * (in_c // groups) * out_c * output_h * output_w
         total_macs += macs
 
     def linear_hook(module, inp, out):
@@ -66,7 +63,7 @@ def compute_macs_and_flops(model: nn.Module, input_size: Tuple[int, int]) -> Tup
     for h in hooks:
         h.remove()
 
-    total_flops = total_macs * 2  # 1 MAC = 1 Multiply + 1 Accumulate = 2 FLOPs
+    total_flops = total_macs * 2
     return total_macs, total_flops
 
 
@@ -83,14 +80,12 @@ def measure_latency(
     model.eval()
     dummy = torch.randn(batch_size, 3, *input_size, device=device)
 
-    # Warmup
     with torch.no_grad():
         for _ in range(warmup):
             _ = model(dummy)
             if device.type == "cuda":
                 torch.cuda.synchronize()
 
-    # Latency timing
     timings = []
     with torch.no_grad():
         for _ in range(runs):
@@ -164,10 +159,7 @@ def main():
     else:
         device = torch.device(args.device)
 
-    print(f"\n=======================================================")
-    print(f"  EN3150 Hardware-Aware Edge Benchmark Profile")
-    print(f"  Device: {device} | Batch Size: {args.batch_size} | Iterations: {args.runs}")
-    print(f"=======================================================\n")
+    print(f"\nBenchmark Profile (Device: {device} | Batch Size: {args.batch_size} | Runs: {args.runs})\n")
 
     df = benchmark_all(device=device, batch_size=args.batch_size, runs=args.runs)
 
@@ -175,7 +167,7 @@ def main():
         print(df.to_markdown(index=False))
     except (ImportError, Exception):
         print(df.to_string(index=False))
-    print("\n")
+    print()
 
     if args.out:
         out_path = Path(args.out)

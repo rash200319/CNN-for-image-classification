@@ -1,12 +1,4 @@
-"""EuroSAT RGB Dataset Verification and Statistical Profiling Tool.
-
-Answers Assignment 03 Part 1 (Data Preparation & Dataset Information):
-1. Verifies dataset presence and class structure across all 10 land-use categories.
-2. Asserts image resolution adheres to the <= 64x64 pixel constraint.
-3. Computes per-class sample distribution and balance statistics.
-4. Computes per-channel (RGB) mean and standard deviation across image samples.
-5. Verifies 70% / 15% / 15% stratified split integrity and exact partition counts.
-6. Exports a formatted markdown dataset profile (docs/DATASET.md).
+"""EuroSAT RGB dataset verification and statistical profiling tool.
 
 Usage:
     python -m src.data.verify_dataset
@@ -16,7 +8,7 @@ Usage:
 
 import argparse
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -26,7 +18,7 @@ from src.config import CLASS_NAMES, DATA_DIR, SEED, TEST_SPLIT, TRAIN_SPLIT, VAL
 from src.data.dataset import _stratified_split
 
 
-def find_dataset_dir(custom_path: str = None) -> Path:
+def find_dataset_dir(custom_path: Optional[str] = None) -> Path:
     """Locate EuroSAT RGB dataset directory with fallbacks."""
     candidates = []
     if custom_path:
@@ -46,7 +38,7 @@ def find_dataset_dir(custom_path: str = None) -> Path:
     return candidates[0]
 
 
-def profile_classes(data_dir: Path) -> Tuple[pd.DataFrame, Dict[str, any]]:
+def profile_classes(data_dir: Path) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """Scan classes, sample counts, and image dimensions."""
     records = []
     total_images = 0
@@ -61,10 +53,9 @@ def profile_classes(data_dir: Path) -> Tuple[pd.DataFrame, Dict[str, any]]:
             count = len(imgs)
             total_images += count
 
-            # Sample first few images to verify dimensions
             for sample_img in imgs[:5]:
                 with Image.open(sample_img) as im:
-                    dimensions.add(im.size)  # (width, height)
+                    dimensions.add(im.size)
 
         records.append({"Class": class_name, "Sample Count": count})
 
@@ -111,7 +102,6 @@ def verify_splits(total_images: int) -> pd.DataFrame:
     for c in range(len(CLASS_NAMES)):
         dummy_targets.extend([c] * per_class)
 
-    # Adjust for any rounding if dataset count differs slightly
     while len(dummy_targets) < total_images:
         dummy_targets.append(len(dummy_targets) % len(CLASS_NAMES))
 
@@ -143,13 +133,13 @@ def verify_splits(total_images: int) -> pd.DataFrame:
 def generate_markdown_report(
     data_dir: Path,
     class_df: pd.DataFrame,
-    meta: Dict[str, any],
+    meta: Dict[str, Any],
     split_df: pd.DataFrame,
     mean: np.ndarray,
     std: np.ndarray,
     out_file: Path,
 ):
-    """Save clean documentation markdown answering Part 1 of Assignment 03."""
+    """Save dataset specification markdown."""
     out_file.parent.mkdir(parents=True, exist_ok=True)
 
     content = f"""# EuroSAT RGB Dataset Specification & Verification Profile
@@ -200,34 +190,25 @@ def main():
     args = parser.parse_args()
 
     data_dir = find_dataset_dir(args.data_dir)
-    print("\n" + "=" * 65)
-    print("  EN3150 EuroSAT Dataset Verification Profile")
-    print(f"  Target Directory: {data_dir}")
-    print("=" * 65 + "\n")
+    print(f"\nEuroSAT Dataset Verification Profile ({data_dir})\n")
 
     class_df, meta = profile_classes(data_dir)
-    print(f">> Total Images Detected: {meta['total_images']:,}")
-    print(f">> Total Classes: {meta['num_classes']}")
-    print(f">> Image Resolutions: {meta['dimensions']}")
+    print(f"Total Images: {meta['total_images']:,} | Classes: {meta['num_classes']} | Resolutions: {meta['dimensions']}")
     print("\nPer-Class Distribution:")
     print(class_df.to_string(index=False))
 
-    print("\n" + "-" * 65)
-    print("Stratified Split Breakdown:")
+    print("\nStratified Split Breakdown:")
     split_df = verify_splits(meta["total_images"] if meta["total_images"] > 0 else 27000)
     print(split_df.to_string(index=False))
 
-    print("\n" + "-" * 65)
-    print("Computing channel statistics...")
     mean, std = compute_channel_stats(data_dir, num_samples_per_class=100)
-    print(f">> Channel Mean (R, G, B): [{mean[0]:.4f}, {mean[1]:.4f}, {mean[2]:.4f}]")
-    print(f">> Channel Std  (R, G, B): [{std[0]:.4f}, {std[1]:.4f}, {std[2]:.4f}]")
-    print("=" * 65 + "\n")
+    print(f"\nChannel Mean (R, G, B): [{mean[0]:.4f}, {mean[1]:.4f}, {mean[2]:.4f}]")
+    print(f"Channel Std  (R, G, B): [{std[0]:.4f}, {std[1]:.4f}, {std[2]:.4f}]\n")
 
     if args.export_md:
         out_file = Path(args.export_md)
         generate_markdown_report(data_dir, class_df, meta, split_df, mean, std, out_file)
-        print(f"Dataset profile documentation exported to: {out_file}\n")
+        print(f"Exported dataset profile to: {out_file}\n")
 
 
 if __name__ == "__main__":
