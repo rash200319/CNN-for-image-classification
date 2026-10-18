@@ -1,16 +1,13 @@
-"""Single-image and batch inference CLI tool for trained EuroSAT classifiers.
+"""Single-image inference CLI tool for trained EuroSAT classifiers.
 
 Usage:
-    # Single image inference with Model B
     python -m src.predict --image path/to/image.jpg --checkpoint outputs/modelb_adam/best_model.pt --model b
-
-    # Single image inference with Pretrained MobileNetV2
     python -m src.predict --image path/to/image.jpg --checkpoint outputs/final_mobilenet_v2/best_model.pt --model mobilenet_v2 --img-size 64
 """
 
 import argparse
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 import torch
 import torch.nn.functional as F
@@ -18,29 +15,13 @@ from PIL import Image
 from torchvision import transforms
 
 from src.config import CLASS_NAMES, IMAGE_SIZE, validate_image_size
-from src.models.model_a import ModelA
-from src.models.model_b import ModelB
-from src.models.pretrained import IMAGENET_MEAN, IMAGENET_STD, PRETRAINED_MODELS, build_pretrained
-
-
-def build_model(name: str, num_classes: int) -> torch.nn.Module:
-    """Build specified model architecture."""
-    if name == "a":
-        return ModelA(num_classes=num_classes)
-    if name == "b":
-        return ModelB(num_classes=num_classes)
-    if name in PRETRAINED_MODELS:
-        return build_pretrained(name, num_classes=num_classes)
-    raise ValueError(f"Unknown model name: {name}")
+from src.models.pretrained import PRETRAINED_MODELS
+from src.utils import build_model, normalization_for
 
 
 def get_inference_transform(model_name: str, img_size: int) -> transforms.Compose:
-    """Construct data preprocessing pipeline consistent with training."""
     validate_image_size(img_size)
-    if model_name in PRETRAINED_MODELS:
-        mean, std = IMAGENET_MEAN, IMAGENET_STD
-    else:
-        mean, std = (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
+    mean, std = normalization_for(model_name)
 
     return transforms.Compose(
         [
@@ -58,7 +39,7 @@ def predict_image(
     device: torch.device,
     top_k: int = 3,
 ) -> List[Dict[str, float]]:
-    """Load an image, execute forward inference, and return top-k predictions."""
+    """Load an image, run inference, and return top-k predictions."""
     image = Image.open(image_path).convert("RGB")
     tensor = transform(image).unsqueeze(0).to(device)
 
@@ -101,10 +82,7 @@ def main():
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
-    if args.img_size is None:
-        img_size = IMAGE_SIZE
-    else:
-        img_size = args.img_size
+    img_size = IMAGE_SIZE if args.img_size is None else args.img_size
     validate_image_size(img_size)
 
     if args.device == "auto":
@@ -119,21 +97,15 @@ def main():
     transform = get_inference_transform(args.model, img_size)
     predictions = predict_image(model, image_path, transform, device, top_k=args.top_k)
 
-    print("\n" + "=" * 50)
-    print(f"  EuroSAT Land-Use Classification Result")
-    print(f"  Image: {image_path.name}")
-    print(f"  Model: {args.model.upper()} | Device: {device.type.upper()}")
-    print("=" * 50)
-
     top_pred = predictions[0]
-    print(f"\n>> PREDICTED CLASS: [{top_pred['class_name']}] ({top_pred['confidence_percent']}%) <<\n")
-
-    print("Top Predictions Breakdown:")
+    print(f"\nImage: {image_path.name} | Model: {args.model.upper()} | Device: {device.type.upper()}")
+    print(f"Predicted Class: {top_pred['class_name']} ({top_pred['confidence_percent']}%)")
+    print("\nTop Predictions:")
     for rank, p in enumerate(predictions, 1):
         bar_len = int(p["confidence"] * 25)
         bar = "#" * bar_len + "-" * (25 - bar_len)
         print(f"  {rank}. {p['class_name']:<22} {p['confidence_percent']:>6.2f}%  [{bar}]")
-    print("=" * 50 + "\n")
+    print()
 
 
 if __name__ == "__main__":

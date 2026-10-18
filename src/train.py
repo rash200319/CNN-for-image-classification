@@ -25,28 +25,10 @@ from tqdm import tqdm
 
 from src.config import IMAGE_SIZE, SEED, validate_image_size
 from src.data.dataset import get_dataloaders
-from src.models.model_a import ModelA
-from src.models.model_b import ModelB
-from src.models.pretrained import IMAGENET_MEAN, IMAGENET_STD, PRETRAINED_MODELS, build_pretrained
-from src.utils import count_parameters
+from src.models.pretrained import PRETRAINED_MODELS
+from src.utils import build_model, count_parameters, normalization_for
 
 OUTPUT_DIR = Path(__file__).resolve().parent.parent / "outputs"
-
-
-def build_model(name: str, num_classes: int) -> nn.Module:
-    if name == "a":
-        return ModelA(num_classes=num_classes)
-    if name == "b":
-        return ModelB(num_classes=num_classes)
-    if name in PRETRAINED_MODELS:
-        return build_pretrained(name, num_classes=num_classes)
-    raise ValueError(f"Unknown model: {name}")
-
-
-def normalization_for(name: str):
-    if name in PRETRAINED_MODELS:
-        return IMAGENET_MEAN, IMAGENET_STD
-    return (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
 
 
 def build_optimizer(name: str, params, lr: float, momentum: float) -> torch.optim.Optimizer:

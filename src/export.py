@@ -1,20 +1,8 @@
-"""Edge Deployment Export tool: exports trained PyTorch models to TorchScript and ONNX.
-
-Verifies:
-1. Valid export to TorchScript (.torchscript.pt) via JIT tracing.
-2. Valid export to ONNX (.onnx) with graph structure validation.
-3. Numerical parity check: asserts exported models produce identical output
-   logits to PyTorch within floating-point tolerance (torch.allclose, atol=1e-5).
-4. Detailed on-disk footprint comparison across formats.
+"""Export trained PyTorch models to TorchScript and ONNX with numerical parity checks.
 
 Usage:
-    # Export Model B
     python -m src.export --model b --checkpoint outputs/modelb_adam/best_model.pt
-
-    # Export Model A
-    python -m src.export --model a --checkpoint outputs/modela_adam/best_model.pt
-
-    # Export all trained models
+    python -m src.export --model a --checkpoint outputs/final_a_adam/best_model.pt
     python -m src.export --all
 """
 
@@ -32,21 +20,8 @@ except ImportError:
     HAS_ONNX = False
 
 from src.config import CLASS_NAMES, IMAGE_SIZE, validate_image_size
-from src.models.model_a import ModelA
-from src.models.model_b import ModelB
-from src.models.pretrained import PRETRAINED_MODELS, build_pretrained
-from src.utils import count_parameters
-
-
-def build_model(name: str, num_classes: int) -> nn.Module:
-    """Instantiate model architecture."""
-    if name == "a":
-        return ModelA(num_classes=num_classes)
-    if name == "b":
-        return ModelB(num_classes=num_classes)
-    if name in PRETRAINED_MODELS:
-        return build_pretrained(name, num_classes=num_classes)
-    raise ValueError(f"Unknown model architecture: {name}")
+from src.models.pretrained import PRETRAINED_MODELS
+from src.utils import build_model, count_parameters
 
 
 def export_torchscript(
@@ -60,7 +35,6 @@ def export_torchscript(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     traced_model.save(str(out_path))
 
-    # Parity check
     with torch.no_grad():
         orig_out = model(dummy_input)
         loaded_traced = torch.jit.load(str(out_path))
@@ -105,11 +79,9 @@ def export_onnx(
         dynamic_axes=dynamic_axes,
     )
 
-    # Validate ONNX graph structure
     onnx_model = onnx.load(str(out_path))
     onnx.checker.check_model(onnx_model)
 
-    # If onnxruntime is installed, check numerical parity
     max_diff = None
     try:
         import onnxruntime as ort
@@ -121,7 +93,7 @@ def export_onnx(
         max_diff = (orig_out - onnx_out).abs().max().item()
         assert torch.allclose(orig_out, onnx_out, atol=1e-4), f"ONNX parity failure: max diff {max_diff}"
     except ImportError:
-        pass  # Graph validation still ran; numerical parity was not tested.
+        pass
 
     return out_path, max_diff
 
@@ -133,7 +105,7 @@ def export_and_benchmark(
     img_size: int = IMAGE_SIZE,
     opset_version: int = 14,
 ) -> Dict[str, Any]:
-    """Perform end-to-end export to TorchScript & ONNX and return size/parity metrics."""
+    """Export a checkpoint to TorchScript and ONNX and return size/parity metrics."""
     validate_image_size(img_size)
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
@@ -151,11 +123,10 @@ def export_and_benchmark(
     ts_path = out_dir / f"{model_name}.torchscript.pt"
     onnx_path = out_dir / f"{model_name}.onnx"
 
-    # Run exports
     _, ts_max_diff = export_torchscript(model, dummy_input, ts_path)
     _, onnx_max_diff = export_onnx(model, dummy_input, onnx_path, opset_version=opset_version)
 
-    orig_kb = checkpoint_path.stat().st_size / 1024 if checkpoint_path.exists() else 0.0
+    orig_kb = checkpoint_path.stat().st_size / 1024
     ts_kb = ts_path.stat().st_size / 1024
     onnx_kb = onnx_path.stat().st_size / 1024
 
@@ -184,12 +155,15 @@ def main():
     args = parser.parse_args()
 
     out_dir = Path(args.out_dir)
+    default_checkpoints = {
+        "a": Path("outputs/final_a_adam/best_model.pt"),
+        "b": Path("outputs/modelb_adam/best_model.pt"),
+    }
 
-    targets = []
     if args.all:
         targets = [
-            ("a", Path("outputs/final_a_adam/best_model.pt"), IMAGE_SIZE),
-            ("b", Path("outputs/modelb_adam/best_model.pt"), IMAGE_SIZE),
+            ("a", default_checkpoints["a"], IMAGE_SIZE),
+            ("b", default_checkpoints["b"], IMAGE_SIZE),
         ]
     else:
         img_size = args.img_size or IMAGE_SIZE
@@ -197,19 +171,13 @@ def main():
         chk = (
             Path(args.checkpoint)
             if args.checkpoint
-            else Path(f"outputs/model{args.model}_adam/best_model.pt")
+            else default_checkpoints.get(args.model, Path(f"outputs/final_{args.model}/best_model.pt"))
         )
         targets = [(args.model, chk, img_size)]
 
-    print("\n" + "=" * 65)
-    print("  EN3150 Edge Model Exporter: TorchScript & ONNX")
-    print("=" * 65)
-
     results = []
     for model_name, chk_path, img_size in targets:
-        print(f"\n[+] Exporting {model_name.upper()}...")
-        print(f"    Checkpoint: {chk_path}")
-        print(f"    Input shape: 3x{img_size}x{img_size}")
+        print(f"\nExporting {model_name.upper()} ({chk_path}, 3x{img_size}x{img_size})...")
 
         res = export_and_benchmark(
             model_name=model_name,
@@ -220,16 +188,12 @@ def main():
         )
         results.append(res)
 
-        print(f"    [OK] TorchScript: {res['ts_path']} ({res['torchscript_kb']} KB)")
-        print(f"         Parity (max abs diff): {res['ts_max_diff']:.2e}")
-        print(f"    [OK] ONNX:        {res['onnx_path']} ({res['onnx_kb']} KB)")
+        print(f"  TorchScript: {res['ts_path']} ({res['torchscript_kb']} KB, max diff: {res['ts_max_diff']:.2e})")
         parity = res["onnx_max_diff"]
         parity_text = f"{parity:.2e}" if parity is not None else "not tested"
-        print(f"         Parity (max abs diff): {parity_text}")
+        print(f"  ONNX:        {res['onnx_path']} ({res['onnx_kb']} KB, max diff: {parity_text})")
 
-    print("\n" + "=" * 65)
-    print("  Summary: On-Disk Edge Footprint Comparison")
-    print("=" * 65)
+    print("\nOn-Disk Edge Footprint Comparison:")
     header = f"{'Model':<10} {'Params':<10} {'PyTorch (KB)':<15} {'TorchScript (KB)':<18} {'ONNX (KB)':<12}"
     print(header)
     print("-" * len(header))
@@ -238,7 +202,7 @@ def main():
             f"{r['model'].upper():<10} {r['parameters']:<10,} {r['pytorch_kb']:<15} "
             f"{r['torchscript_kb']:<18} {r['onnx_kb']:<12}"
         )
-    print("=" * 65 + "\n")
+    print()
 
 
 if __name__ == "__main__":

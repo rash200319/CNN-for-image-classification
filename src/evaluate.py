@@ -19,28 +19,10 @@ import matplotlib.pyplot as plt
 import torch
 from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
 
-from src.config import IMAGE_SIZE
+from src.config import IMAGE_SIZE, validate_image_size
 from src.data.dataset import get_dataloaders
-from src.models.model_a import ModelA
-from src.models.model_b import ModelB
-from src.models.pretrained import IMAGENET_MEAN, IMAGENET_STD, PRETRAINED_MODELS, build_pretrained
-from src.utils import count_parameters
-
-
-def build_model(name: str, num_classes: int) -> torch.nn.Module:
-    if name == "a":
-        return ModelA(num_classes=num_classes)
-    if name == "b":
-        return ModelB(num_classes=num_classes)
-    if name in PRETRAINED_MODELS:
-        return build_pretrained(name, num_classes=num_classes)
-    raise ValueError(f"Unknown model: {name}")
-
-
-def normalization_for(name: str):
-    if name in PRETRAINED_MODELS:
-        return IMAGENET_MEAN, IMAGENET_STD
-    return (0.5, 0.5, 0.5), (0.5, 0.5, 0.5)
+from src.models.pretrained import PRETRAINED_MODELS
+from src.utils import build_model, count_parameters, normalization_for
 
 
 @torch.no_grad()
@@ -83,6 +65,7 @@ def main():
     parser.add_argument("--img-size", type=int, default=IMAGE_SIZE)
     parser.add_argument("--run-name", type=str, default=None)
     args = parser.parse_args()
+    validate_image_size(args.img_size)
 
     checkpoint_path = Path(args.checkpoint)
     run_dir = checkpoint_path.parent if args.run_name is None else \
