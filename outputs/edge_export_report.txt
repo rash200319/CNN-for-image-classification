@@ -1,0 +1,58 @@
+
+=================================================================
+  EN3150 Edge Model Exporter: TorchScript & ONNX
+=================================================================
+
+[+] Exporting A...
+    Checkpoint: outputs/final_a_adam/best_model.pt
+    Input shape: 3x64x64
+[torch.onnx] Obtain model graph for `ModelA([...]` with `torch.export.export(..., strict=False)`...
+[torch.onnx] Obtain model graph for `ModelA([...]` with `torch.export.export(..., strict=False)`... ✅
+[torch.onnx] Run decompositions...
+[torch.onnx] Run decompositions... ✅
+[torch.onnx] Translate the graph into ONNX...
+[torch.onnx] Translate the graph into ONNX... ✅
+[torch.onnx] Optimize the ONNX graph...
+[torch.onnx] Optimize the ONNX graph... ✅
+    [OK] TorchScript: outputs/edge_exports/a.torchscript.pt (2171.7 KB)
+         Parity (max abs diff): 0.00e+00
+    [OK] ONNX:        outputs/edge_exports/a.onnx (19.4 KB)
+         Parity (max abs diff): 7.63e-06
+
+=================================================================
+  Summary: On-Disk Edge Footprint Comparison
+=================================================================
+Model      Params     PyTorch (KB)    TorchScript (KB)   ONNX (KB)   
+---------------------------------------------------------------------
+A          549,290    2150.1          2171.7             19.4        
+=================================================================
+
+
+=================================================================
+  EN3150 Edge Model Exporter: TorchScript & ONNX
+=================================================================
+
+[+] Exporting B...
+    Checkpoint: outputs/modelb_adam/best_model.pt
+    Input shape: 3x64x64
+[torch.onnx] Obtain model graph for `ModelB([...]` with `torch.export.export(..., strict=False)`...
+[torch.onnx] Obtain model graph for `ModelB([...]` with `torch.export.export(..., strict=False)`... ✅
+[torch.onnx] Run decompositions...
+[torch.onnx] Run decompositions... ✅
+[torch.onnx] Translate the graph into ONNX...
+[torch.onnx] Translate the graph into ONNX... ✅
+[torch.onnx] Optimize the ONNX graph...
+[torch.onnx] Optimize the ONNX graph... ✅
+    [OK] TorchScript: outputs/edge_exports/b.torchscript.pt (92.6 KB)
+         Parity (max abs diff): 0.00e+00
+    [OK] ONNX:        outputs/edge_exports/b.onnx (26.7 KB)
+         Parity (max abs diff): 9.16e-05
+
+=================================================================
+  Summary: On-Disk Edge Footprint Comparison
+=================================================================
+Model      Params     PyTorch (KB)    TorchScript (KB)   ONNX (KB)   
+---------------------------------------------------------------------
+B          13,288     63.9            92.6               26.7        
+=================================================================
+

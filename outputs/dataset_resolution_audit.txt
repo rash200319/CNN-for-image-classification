@@ -1,0 +1,7 @@
+Dataset: archive/EuroSAT
+Total image files: 27000
+Resolution counts:
+  64 x 64: 27000 images
+Maximum resolution: 64 x 64
+Unreadable files: 0
+PASS: All images satisfy the maximum 64 x 64 requirement.
