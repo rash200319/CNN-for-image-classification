@@ -1,0 +1,5 @@
+Model,Input Shape,Parameters,MACs (M),FLOPs (M),Latency (ms/img),Throughput (img/s),Device,Measurement
+Model A (Standard CNN),3x64x64,"549,290",11.73,23.46,0.411,2434.3,CUDA,"synthetic input, untrained model"
+Model B (Depthwise-Sep. CNN),3x64x64,"13,288",5.14,10.28,0.616,1624.2,CUDA,"synthetic input, untrained model"
+MobileNetV2 (Pretrained),3x64x64,"2,236,682",24.46,48.92,4.924,203.1,CUDA,"synthetic input, untrained model"
+EfficientNet-B0 (Pretrained),3x64x64,"4,020,358",31.98,63.96,7.588,131.8,CUDA,"synthetic input, untrained model"

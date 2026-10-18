@@ -1,0 +1,12 @@
+{
+  "model": "efficientnet_b0",
+  "optimizer": "adam",
+  "lr": 0.0001,
+  "momentum": 0.9,
+  "epochs": 5,
+  "img_size": 64,
+  "seed": 42,
+  "device": "cuda",
+  "torch_version": "2.11.0+cu128",
+  "numpy_version": "2.1.3"
+}
