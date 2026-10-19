@@ -29,22 +29,22 @@
 \section{Data Preparation}
 
 \subsection{Dataset}
-This work uses the RGB variant of the \textbf{EuroSAT} land-use/land-cover
-dataset, which consists of 27{,}000 Sentinel-2 satellite image patches of
-size $64 \times 64$ pixels across 10 balanced-ish classes: AnnualCrop,
+This work uses the RGB variant of the \textbf{EuroSAT} land use/land cover
+dataset, which consists of 27{,}000 Sentinel 2 satellite image patches of
+size $64 \times 64$ pixels across 10 balanced ish classes: AnnualCrop,
 Forest, HerbaceousVegetation, Highway, Industrial, Pasture, PermanentCrop,
 Residential, River, and SeaLake. Because the images are already at
 $64\times64$ resolution, no downscaling was required to satisfy the
-assignment's maximum-resolution constraint; both custom models and both
+assignment's maximum resolution constraint; both custom models and both
 pretrained SOTA models are trained and evaluated at $64\times64$ to strictly
-comply with the assignment's maximum-resolution requirement.
+comply with the assignment's maximum resolution requirement.
 
 \subsection{Train / Validation / Test split}
 The dataset was split \textbf{70\% / 15\% / 15\%} into training, validation,
-and test sets using a stratified split (per-class proportions preserved) with
+and test sets using a stratified split (per class proportions preserved) with
 a fixed random seed (42) for reproducibility. This gives approximately
 18{,}900 training, 4{,}050 validation, and 4{,}050 test images; exact
-per-class counts vary by at most one or two images due to stratified
+per class counts vary by at most one or two images due to stratified
 rounding.
 
 \subsection{Preprocessing and augmentation}
@@ -123,24 +123,24 @@ FC2 ($128 \rightarrow 10$) & $128 \cdot 10 + 10$ & 1{,}290 \\
 
 Note that FC1 alone accounts for $524{,}416 / 549{,}290 \approx 95.5\%$ of
 the model's parameters: flattening an $8\times8\times64$ feature map into a
-128-unit fully-connected layer is by far the most expensive operation in
+128 unit fully connected layer is by far the most expensive operation in
 this architecture, far more costly than any of the convolutional layers.
 This observation motivates Model B's design (global average pooling instead
 of a large flatten + FC head). The hand-calculated total of 549{,}290 was
-cross-checked against a runtime parameter count
+cross checked against a runtime parameter count
 (\texttt{sum(p.numel() for p in model.parameters())}) and matches exactly.
 
 \subsection{Model B: Lightweight depthwise-separable CNN}
 
 Model B replaces every standard convolution with a \textbf{depthwise
 separable convolution}: a depthwise $K \times K$ convolution applied
-independently per input channel (no cross-channel mixing), followed by a
+independently per input channel (no cross channel mixing), followed by a
 $1\times1$ pointwise convolution that mixes channels. This is the
-construction used in MobileNet-style architectures, and it reduces the
-multiply-accumulate (MAC) cost of a $3\times3$ convolution by roughly a
+construction used in MobileNet style architectures, and it reduces the
+multiply accumulate (MAC) cost of a $3\times3$ convolution by roughly a
 factor of $K^2 \cdot C_{out} / (K^2 + C_{out})$ (around $8$--$9\times$ for
 typical layer widths) relative to a full standard convolution of the same
-shape. Each depthwise-separable block is followed by batch normalization and
+shape. Each depthwise separable block is followed by batch normalization and
 ReLU. The classifier head uses global average pooling (GAP) instead of a
 flatten, which is the main reason Model B's parameter count stays small.
 
@@ -169,7 +169,7 @@ Linear & $128 \rightarrow 10$ & $10$ \\
 C_{in}$, one filter per channel) costs $C_{in} \cdot K^2 + C_{in}$; a
 pointwise $1\times1$ conv costs $C_{in} \cdot C_{out} + C_{out}$; and a
 BatchNorm2D layer contributes $2C$ learnable parameters (scale $\gamma$ and
-shift $\beta$ only -- the running mean/variance are buffers, not trainable
+shift $\beta$ only : the running mean/variance are buffers, not trainable
 parameters).
 
 \begin{table}[H]
@@ -196,27 +196,27 @@ Classifier ($128 \rightarrow 10$) & $128 \cdot 10 + 10$ & 1{,}290 \\
 \end{tabular}
 \end{table}
 
-This is well within the assignment's 100{,}000-parameter budget for Model B,
+This is well within the assignment's 100{,}000 parameter budget for Model B,
 using only $13.3\%$ of it ($86.7\%$ headroom). This headroom is a deliberate
-consequence of the GAP-based head rather than an accident: a flatten of the
-final $8\times8\times128$ feature map into even a modestly-sized FC layer
+consequence of the GAP based head rather than an accident: a flatten of the
+final $8\times8\times128$ feature map into even a modestly sized FC layer
 would alone cost well over $100{,}000$ parameters, so GAP was essential to
 the design, not an afterthought. The hand-calculated total was likewise
-cross-checked against a runtime parameter count and matches exactly.
+cross checked against a runtime parameter count and matches exactly.
 
 \subsection{Activation function justification}
 Both models use \textbf{ReLU} ($f(x) = \max(0, x)$) exclusively as the
 nonlinearity, rather than sigmoid or tanh. This is justified on
-hardware-efficiency grounds, which matters directly for the
-resource-constrained/edge deployment target of this assignment:
+hardware efficiency grounds, which matters directly for the
+resource constrained/edge deployment target of this assignment:
 \begin{itemize}
   \item ReLU requires only a single comparison and a conditional select per
   element, with no transcendental (exponential) function evaluation. Sigmoid
   and tanh both require computing $e^{-x}$, which is substantially more
-  expensive on microcontroller-class hardware that lacks a dedicated
-  floating-point transcendental unit.
+  expensive on microcontroller class hardware that lacks a dedicated
+  floating point transcendental unit.
   \item ReLU's gradient is either $0$ or $1$, which is cheap to compute
-  during backpropagation and avoids the vanishing-gradient problem that
+  during backpropagation and avoids the vanishing gradient problem that
   sigmoid/tanh exhibit for large $|x|$.
   \item ReLU activations are naturally sparse (exactly zero for negative
   inputs), which many inference engines and accelerators can exploit to skip
@@ -231,8 +231,8 @@ optimizer for the final training runs of both custom models. Adam was
 chosen because it adapts the effective learning rate per parameter using
 running estimates of the first and second gradient moments, which typically
 gives faster and more reliable convergence than plain SGD without requiring
-extensive learning-rate tuning -- a useful property given the limited
-CPU-only compute budget available for this assignment.
+extensive learning-rate tuning : a useful property given the limited
+CPU only compute budget available for this assignment.
 
 \subsection{Comparison against SGD and SGD with Momentum}
 
@@ -269,13 +269,13 @@ loss and accuracy vs. epoch, for Adam, plain SGD, and SGD with momentum.}
 \label{fig:model-a-sweep}
 \end{figure}
 
-\paragraph{Model B, full 20-epoch runs.} As a second, independent
-confirmation, Model B was trained to completion (20 epochs, test-set
+\paragraph{Model B, full 20 epoch runs.} As a second, independent
+confirmation, Model B was trained to completion (20 epochs, test set
 evaluated) under all three optimizer settings.
 
 \begin{table}[H]
 \centering
-\caption{Model B optimizer comparison, full 20-epoch test-set results.}
+\caption{Model B optimizer comparison, full 20 epoch test set results.}
 \label{tab:model-b-optimizer}
 \begin{tabular}{lrrr}
 \toprule
@@ -289,22 +289,22 @@ SGD + Momentum (0.9) & 89.90\% & 0.8963 & 0.8968 \\
 \end{table}
 
 \paragraph{Discussion: effect of momentum.} In both experiments, plain SGD
-is clearly the weakest optimizer -- its validation loss is both higher and
+is clearly the weakest optimizer : its validation loss is both higher and
 visibly less stable (Figure~\ref{fig:model-a-sweep} shows a sharp spike
 around epoch 5), and on Model B it is $11.13$ percentage points behind
 Adam in test accuracy ($79.88\%$ vs.\ $91.01\%$). Adding momentum (velocity term $v_{t} = \mu v_{t-1} +
 \nabla_\theta \mathcal{L}$, with the parameter update using $v_t$ instead of
 the raw gradient) at the \emph{same} learning rate dramatically changes this
-picture: the momentum term accumulates an exponentially-weighted average of
+picture: the momentum term accumulates an exponentially weighted average of
 past gradients, which (i) damps oscillation in directions where the gradient
 sign repeatedly flips, and (ii) effectively increases the step size in
 directions where the gradient is consistently pointing the same way. This is
-exactly what is observed here -- SGD with momentum converges significantly faster
+exactly what is observed here : SGD with momentum converges significantly faster
 than plain SGD (+$10.02$ percentage points) and closes nearly the entire accuracy gap,
 reaching $89.90\%$ test accuracy (within $1.11$ percentage points of Adam on Model B,
 and ahead of Adam on the Model A sweep by epoch 10), despite using a much simpler update rule.
 This confirms that most of the practical convergence benefit over plain SGD in this setting comes
-from momentum specifically, rather than from Adam's additional per-parameter
+from momentum specifically, rather than from Adam's additional per parameter
 adaptive scaling.
 
 \section{Custom Model Training and Evaluation}
@@ -334,7 +334,7 @@ track closely for roughly the first 11 epochs, after which a gap opens: by
 epoch 20, training accuracy reaches $92.0\%$ while validation accuracy
 peaks at $89.4\%$ ($88.1\%$ at epoch 20). This is a mild overfitting
 signal, consistent with the architectural observation from
-Section~\ref{sec:custom-models} that Model A's $524{,}416$-parameter FC1
+Section~\ref{sec:custom-models} that Model A's $524{,}416$  parameter FC1
 layer ($95.5\%$ of all parameters) has no dropout, weight decay, or batch
 normalization to regularize it. Model B's curves
 (Figure~\ref{fig:model-b-loss}) show no such late-training divergence,
@@ -361,7 +361,7 @@ parameters available to overfit.
 
 \begin{table}[H]
 \centering
-\caption{Per-class precision and recall on the test set, Model A vs. Model B.}
+\caption{Per class precision and recall on the test set, Model A vs. Model B.}
 \label{tab:per-class-ab}
 \begin{tabular}{lrrrr}
 \toprule
@@ -388,7 +388,7 @@ Both models share the same two hardest confusion pairs:
 \textbf{Highway$\leftrightarrow$River} (both thin, elongated, linear
 features at this resolution) and \textbf{HerbaceousVegetation
 $\leftrightarrow$ PermanentCrop} (overlapping crop/vegetation texture). These
-are the lowest-recall classes for both models, which suggests the confusion
+are the lowest recall classes for both models, which suggests the confusion
 is a genuine property of the dataset at $64\times64$ RGB resolution rather
 than a weakness specific to either architecture.
 
@@ -407,23 +407,23 @@ Model B (depthwise-sep.) & 13{,}288 & 63.9 KB & 8.66 s & \textbf{91.01\%} \\
 \bottomrule
 \end{tabular}
 \end{table}
-\emph{Time/epoch is reported as the median across epochs on a dedicated Tesla T4 GPU, providing an exact, head-to-head wall-clock comparison under identical cloud hardware.}
+\emph{Time/epoch is reported as the median across epochs on a dedicated Tesla T4 GPU, providing an exact, head to head wall clock comparison under identical cloud hardware.}
 
-\subsection{Discussion: standard vs. depthwise-separable trade-offs}
+\subsection{Discussion: standard vs. depthwise separable trade offs}
 
 Model B uses only $13{,}288 / 549{,}290 \approx 2.4\%$ of Model A's
 parameters and produces a checkpoint roughly $34\times$ smaller
 ($63.9$~KB vs.\ $2{,}150.1$~KB), while actually \emph{outperforming} Model A
 by $0.98$ percentage points ($91.01\%$ vs.\ $90.03\%$) on the test set. This is
-a striking result for the depthwise-separable design: by replacing the dense
-$524{,}416$-parameter flatten+FC1 head with global average pooling and adding
+a striking result for the depthwise separable design: by replacing the dense
+$524{,}416$ parameter flatten+FC1 head with global average pooling and adding
 batch normalization to each depthwise-separable stage, Model B eliminates the
 overfitting bottleneck of Model A while cutting the memory footprint by $97.0\%$.
 
-When comparing wall-clock training speed on the GPU, Model B's median epoch time
+When comparing wall clock training speed on the GPU, Model B's median epoch time
 ($8.66$~s) is nearly identical to Model A's ($8.53$~s). Despite having $97.6\%$ fewer
 trainable parameters and $2.28\times$ fewer theoretical MAC operations ($5.14$~M vs.\ $11.73$~M), Model B does
-not show a wall-clock speedup on a desktop/datacenter GPU because grouped depthwise
+not show a wall clock speedup on a desktop/datacenter GPU because grouped depthwise
 convolutions have lower arithmetic intensity (FLOPs per byte transferred) compared to dense
 convolutions, which fully saturate GPU tensor cores. On edge hardware with specialized
 runtimes (such as TFLite with XNNPACK or mobile NPUs), the substantial reduction in total
@@ -433,8 +433,8 @@ SRAM and Flash memory budgets where Model A would exceed available capacity.
 \section{SOTA Fine-Tuning and Evaluation}
 \label{sec:sota}
 
-Two ImageNet-pretrained, mobile/edge-oriented architectures were fine-tuned
-end-to-end on the same EuroSAT data splits and compliant $64\times64$ input
+Two ImageNet-pretrained, mobile/edge oriented architectures were fine tuned
+end to end on the same EuroSAT data splits and compliant $64\times64$ input
 resolution used for the custom models:
 \textbf{MobileNetV2} and \textbf{EfficientNet-B0}. For both, the final
 ImageNet classification layer was replaced with a fresh
@@ -445,7 +445,7 @@ pretrained features too aggressively) for 5 epochs.
 
 \begin{table}[H]
 \centering
-\caption{SOTA fine-tuning results (5 epochs, Adam, $\text{lr}=10^{-4}$, $64\times64$, Tesla T4 GPU).}
+\caption{SOTA fine tuning results (5 epochs, Adam, $\text{lr}=10^{-4}$, $64\times64$, Tesla T4 GPU).}
 \label{tab:sota-results}
 \begin{tabular}{lrrrrrr}
 \toprule
@@ -460,7 +460,7 @@ EfficientNet-B0 & $64\times64$ & 4{,}020{,}358 & 15.62 & 16.39 s & 97.36\% & 0.9
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{figures/mobilenetv2_loss_curve.png}
-\caption{MobileNetV2 ($64\times64$) fine-tuning: training/validation loss and accuracy.}
+\caption{MobileNetV2 ($64\times64$) fine tuning: training/validation loss and accuracy.}
 \label{fig:mobilenetv2-loss}
 \end{figure}
 
@@ -474,7 +474,7 @@ EfficientNet-B0 & $64\times64$ & 4{,}020{,}358 & 15.62 & 16.39 s & 97.36\% & 0.9
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.85\textwidth]{figures/efficientnetb0_loss_curve.png}
-\caption{EfficientNet-B0 ($64\times64$) fine-tuning: training/validation loss and accuracy.}
+\caption{EfficientNet-B0 ($64\times64$) fine tuning: training/validation loss and accuracy.}
 \label{fig:effnet-loss}
 \end{figure}
 
@@ -487,7 +487,7 @@ EfficientNet-B0 & $64\times64$ & 4{,}020{,}358 & 15.62 & 16.39 s & 97.36\% & 0.9
 
 \begin{table}[H]
 \centering
-\caption{Per-class precision and recall on the test set ($64\times64$), MobileNetV2 vs. EfficientNet-B0.}
+\caption{Per class precision and recall on the test set ($64\times64$), MobileNetV2 vs. EfficientNet-B0.}
 \label{tab:per-class-sota}
 \begin{tabular}{lrrrr}
 \toprule
@@ -510,19 +510,19 @@ SeaLake               & 0.996 & 0.989 & 0.998 & 0.987 \\
 \end{tabular}
 \end{table}
 
-Both fine-tuned models comfortably exceed both custom models after only 5
-epochs at the same $64\times64$ resolution -- expected, since they begin from
-ImageNet-pretrained features rather than random initialization. The same two
+Both fine tuned models comfortably exceed both custom models after only 5
+epochs at the same $64\times64$ resolution expected, since they begin from
+ImageNet pretrained features rather than random initialization. The same two
 confusion pairs identified for the custom models (Highway/River,
 HerbaceousVegetation/PermanentCrop) are still visible in
 Figures~\ref{fig:mobilenetv2-cm} and~\ref{fig:effnet-cm}, but at far smaller
 magnitude, reinforcing that these are genuinely hard classes for this dataset
-at $64\times64$ resolution rather than an architecture-specific weakness. At
+at $64\times64$ resolution rather than an architecture specific weakness. At
 equal $64\times64$ input resolution, MobileNetV2 ($97.58\%$) slightly edges
-out EfficientNet-B0 ($97.36\%$) while using roughly $44\%$ fewer parameters
+out EfficientNet B0 ($97.36\%$) while using roughly $44\%$ fewer parameters
 and training $24\%$ faster per epoch ($12.45$~s vs.\ $16.39$~s).
 
-\section{Final Comparison and Trade-off Discussion}
+\section{Final Comparison and Trade off Discussion}
 \label{sec:final-comparison}
 
 \begin{table}[H]
@@ -541,7 +541,7 @@ EfficientNet-B0 (fine-tuned, $64\times64$) & 4{,}020{,}358 & 15.62 & 97.36\% & 3
 \end{tabular}
 \end{table}
 
-\paragraph{Accuracy.} The fine-tuned SOTA models outperform Model B by
+\paragraph{Accuracy.} The fine tuned SOTA models outperform Model B by
 $6.35$--$6.57$ percentage points in test accuracy ($97.58\%$ and $97.36\%$ vs.\ $91.01\%$).
 This gap is the direct benefit of transfer learning: both SOTA models started from features
 learned on millions of ImageNet images, while Model B was trained entirely
@@ -551,7 +551,7 @@ from scratch on EuroSAT's 18{,}900 training images.
 steeply: MobileNetV2's checkpoint is about $141\times$ larger than Model
 B's, and EfficientNet-B0's is about $252\times$ larger. In absolute terms,
 Model B's $63.9$~KB footprint ($92.6$~KB in TorchScript, $26.7$~KB graph in ONNX) is small enough to plausibly fit in the flash/RAM
-of a microcontroller-class device (e.g.\ typical Cortex-M class chips with
+of a microcontroller class device (e.g.\ typical Cortex-M class chips with
 hundreds of KB to a few MB of flash), whereas both SOTA models' $8.8$--$15.6$~MB
 footprints exceed that budget by two to three orders of magnitude and would
 only be viable on richer edge hardware (e.g.\ a Raspberry Pi, a phone, or a
@@ -563,7 +563,7 @@ batch-one latency on the Kaggle benchmark machine was $0.41$~ms GPU / $1.20$~ms 
 $0.62$~ms GPU / $2.40$~ms CPU (Model B), $4.92$~ms GPU / $7.70$~ms CPU (MobileNetV2), and
 $7.59$~ms GPU / $10.86$~ms CPU (EfficientNet-B0).
 These measurements use newly initialized models and synthetic inputs, not
-trained checkpoints, and are not physical edge-device measurements. The MAC
+trained checkpoints, and are not physical edge device measurements. The MAC
 profiler excludes normalization, activation, pooling, and other overhead.
 Fine-tuning the SOTA models required far
 fewer epochs to reach high accuracy (5 vs.\ 20 for the custom models),
@@ -573,22 +573,22 @@ $12.45$~s per epoch and EfficientNet-B0 required $16.39$~s per epoch,
 compared to Model B's $8.66$~s per epoch. Inference-time results depend heavily on the deployment hardware's support for
 standard vs.\ depthwise-separable/grouped convolution kernels.
 
-\paragraph{Recommendation.} The choice between a custom sub-100k-parameter
+\paragraph{Recommendation.} The choice between a custom sub 100k parameter
 model and a fine-tuned SOTA model is fundamentally a question of \emph{where
-in the accuracy-memory-compute space the target hardware sits}:
+in the accuracy memory compute space the target hardware sits}:
 \begin{itemize}
-  \item For the tightest microcontroller-class targets (KB-scale memory, no
-  practical way to download or store multi-MB weights), Model B is the only
+  \item For the tightest microcontroller class targets (KB scale memory, no
+  practical way to download or store multi MB weights), Model B is the only
   one of the three options that is even feasible, and its $91.01\%$
   accuracy is a strong result for that constraint.
   \item For richer edge devices with MB-scale memory and reasonable compute
-  (Raspberry Pi-class hardware, phones, edge accelerators), the
-  $6.4$--$6.6$-percentage-point accuracy improvement from a fine-tuned SOTA
+  (Raspberry Pi class hardware, phones, edge accelerators), the
+  $6.4$--$6.6$ percentage point accuracy improvement from a fine tuned SOTA
   model is substantial and, given the available memory headroom, likely
-  worth the larger footprint -- particularly since production inference
+  worth the larger footprint : particularly since production inference
   runtimes (e.g.\ TFLite/XNNPACK, mobile NPUs) are specifically optimized
-  for depthwise-separable operations and would likely close or reverse the
-  CPU-training-time gap observed in this assignment's unoptimized training
+  for depthwise separable operations and would likely close or reverse the
+  CPU training time gap observed in this assignment's unoptimized training
   environment.
   \item There is no universally "better" choice among the three models;
   the right one depends entirely on the deployment target's memory budget
@@ -598,19 +598,19 @@ in the accuracy-memory-compute space the target hardware sits}:
 \section{Conclusion}
 
 This assignment implemented and evaluated two custom CNNs (a standard
-549{,}290-parameter model and a 13{,}288-parameter depthwise-separable
-model, $97.6\%$ smaller) and two fine-tuned pretrained lightweight models
-(MobileNetV2 and EfficientNet-B0) on the EuroSAT land-use classification
+549{,}290 parameter model and a 13{,}288 parameter depthwise separable
+model, $97.6\%$ smaller) and two fine tuned pretrained lightweight models
+(MobileNetV2 and EfficientNet-B0) on the EuroSAT land use classification
 task, with all four models trained and evaluated at the compliant $64\times64$
 resolution on an identical 70/15/15 stratified split. Using the selected Adam
 runs, Model A reached $90.03\%$ test accuracy and Model B reached $91.01\%$,
-demonstrating that depthwise-separable convolutions paired with batch
-normalization and global average pooling can match or exceed a $41\times$-larger
-standard CNN while fitting easily within a sub-100k parameter budget. The
-two fine-tuned SOTA models reached $97.58\%$ (MobileNetV2) and $97.36\%$
+demonstrating that depthwise separable convolutions paired with batch
+normalization and global average pooling can match or exceed a $41\times$ larger
+standard CNN while fitting easily within a sub 100k parameter budget. The
+two fine tuned SOTA models reached $97.58\%$ (MobileNetV2) and $97.36\%$
 (EfficientNet-B0) at $64\times64$ resolution at the cost of $141$--$252\times$
 larger checkpoint footprints. These results illustrate the classic
-accuracy-vs-footprint trade-off that governs edge-deployment model
+accuracy vs footprint trade off that governs edge deployment model
 selection: the "best" model depends on where the target hardware sits on
 that spectrum, not on a single universal accuracy ranking.
 
