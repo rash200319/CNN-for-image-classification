@@ -8,6 +8,8 @@
 \usepackage{caption}
 \usepackage{xcolor}
 \usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
 
 \hypersetup{
   pdftitle={EN3150 Assignment 03 - Resource-Constrained CNN for Edge Image Classification},
@@ -61,6 +63,45 @@ networks were originally trained with.
 
 The dataset information sheet was completed and checked against the RGB
 EuroSAT dataset used in this work.
+
+\subsection{Pipeline overview}
+
+Figure~\ref{fig:data-pipeline} summarizes the data preparation pipeline
+described above, from raw images to model-ready batches.
+
+\begin{figure}[H]
+\centering
+\resizebox{0.92\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=7mm and 10mm,
+  box/.style={draw, rounded corners, align=center, font=\small, minimum height=8mm, inner sep=4pt},
+  wide/.style={box, minimum width=9cm},
+  narrow/.style={box, minimum width=4.2cm},
+  arr/.style={-{Stealth[length=2.2mm]}}
+]
+\node[wide] (raw) {Raw EuroSAT RGB images: 27{,}000 images, 10 classes, $64\times64\times3$};
+\node[wide, below=of raw] (paths) {Collect file paths + integer class labels (\texttt{ImageFolder})};
+\node[wide, below=of paths] (split) {Stratified train/val/test split, 70\% / 15\% / 15\%, seed $=42$};
+\node[narrow, below=14mm of split, xshift=-4.6cm] (train) {Training\\18{,}900 images};
+\node[narrow, below=14mm of split] (val) {Validation\\4{,}050 images};
+\node[narrow, below=14mm of split, xshift=4.6cm] (test) {Test\\4{,}050 images};
+\node[wide, below=14mm of val] (prep) {Resize to model input size; per-channel normalize (custom models: $\mu{=}\sigma{=}0.5$; SOTA models: ImageNet statistics); \textbf{training split only}: random horizontal + vertical flip};
+\node[wide, below=of prep] (batch) {Batch (size 64) $\rightarrow$ model};
+
+\draw[arr] (raw) -- (paths);
+\draw[arr] (paths) -- (split);
+\draw[arr] (split) -- (train);
+\draw[arr] (split) -- (val);
+\draw[arr] (split) -- (test);
+\draw[arr] (train) -- (prep);
+\draw[arr] (val) -- (prep);
+\draw[arr] (test) -- (prep);
+\draw[arr] (prep) -- (batch);
+\end{tikzpicture}%
+}
+\caption{Data preparation and preprocessing pipeline.}
+\label{fig:data-pipeline}
+\end{figure}
 
 \section{Custom Architecture Design}
 \label{sec:custom-models}
@@ -311,7 +352,44 @@ adaptive scaling.
 \label{sec:custom-training}
 
 Both Model A and Model B were trained for 20 epochs using Adam
-($\text{lr}=10^{-3}$), as justified in Section~\ref{sec:optimizer}.
+($\text{lr}=10^{-3}$), as justified in Section~\ref{sec:optimizer}. The same
+training, evaluation, and comparison pipeline (Figure~\ref{fig:training-pipeline})
+was used for all four models reported in this document, so that figures and
+tables can be regenerated directly from saved run artifacts rather than
+copied by hand.
+
+\begin{figure}[H]
+\centering
+\resizebox{0.92\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=7mm and 10mm,
+  box/.style={draw, rounded corners, align=center, font=\small, minimum height=8mm, inner sep=4pt},
+  wide/.style={box, minimum width=7.6cm},
+  narrow/.style={box, minimum width=5.6cm},
+  arr/.style={-{Stealth[length=2.2mm]}}
+]
+\node[wide] (train) {\texttt{train.py}: model, optimizer, learning rate, epochs};
+\node[wide, below=of train] (ckpt) {\texttt{best\_model.pt} (checkpoint) + \texttt{history.csv} (per-epoch train/val loss, accuracy, time)};
+\node[narrow, below=14mm of ckpt, xshift=-3.3cm] (eval) {\texttt{evaluate.py} on test set};
+\node[narrow, below=14mm of ckpt, xshift=3.3cm] (plot) {\texttt{plot\_history.py}};
+\node[narrow, below=of eval] (evalout) {\texttt{metrics.json} + \texttt{confusion\_matrix.png}};
+\node[narrow, below=of plot] (plotout) {\texttt{loss\_curve.png}};
+\node[wide, below=16mm of evalout, xshift=1.65cm] (compare) {\texttt{compare\_runs.py}: aggregates \texttt{metrics.json} + \texttt{history.csv} across runs};
+\node[wide, below=of compare] (table) {\texttt{comparison\_table.csv} $\rightarrow$ report tables and figures};
+
+\draw[arr] (train) -- (ckpt);
+\draw[arr] (ckpt) -- (eval);
+\draw[arr] (ckpt) -- (plot);
+\draw[arr] (eval) -- (evalout);
+\draw[arr] (plot) -- (plotout);
+\draw[arr] (evalout) -- (compare);
+\draw[arr] (plotout) -- (compare);
+\draw[arr] (compare) -- (table);
+\end{tikzpicture}%
+}
+\caption{Training, evaluation, and comparison pipeline, shared by all four models.}
+\label{fig:training-pipeline}
+\end{figure}
 
 \subsection{Loss curves}
 
@@ -557,6 +635,26 @@ footprints exceed that budget by two to three orders of magnitude and would
 only be viable on richer edge hardware (e.g.\ a Raspberry Pi, a phone, or a
 device with a dedicated NPU and MB-scale memory).
 
+\paragraph{Activation memory: parameters are not the whole story.} Table~\ref{tab:final-comparison}
+measures memory with stored weights alone, but peak RAM during inference is
+dominated by the largest live feature maps, not the parameter count. For
+Model A, the largest activation occurs at the first convolution: a
+$16\times64\times64$ output (65{,}536 values) held alongside the
+$3\times64\times64$ input (12{,}288 values), approximately 77{,}824 values
+in total. For Model B, the first depthwise-separable block is \emph{wider}
+(32 output channels, chosen to give the network enough capacity after
+removing Model A's large dense head) and produces a $32\times64\times64$
+pointwise output (131{,}072 values) alongside the same input, approximately
+143{,}360 values in total -- roughly $1.8\times$ \emph{more} peak activation
+memory than Model A, despite Model B having $97.6\%$ fewer parameters. In
+float32 this is about $304$~KB (Model A) vs.\ $560$~KB (Model B); after INT8
+quantization, approximately $76$~KB vs.\ $140$~KB (analytic estimate from
+tensor shapes, excluding interpreter/runtime overhead). This is a useful
+counterpoint to the headline parameter-count comparison: Model B's advantage
+is in \emph{stored weight} footprint, not necessarily in peak working
+memory, and a microcontroller target would need to budget SRAM for both
+figures, not just the checkpoint size.
+
 \paragraph{Computational cost.} The final table includes theoretical
 convolution and linear MAC estimates at $64\times64$. Indicative synthetic
 batch-one latency on the Kaggle benchmark machine was $0.41$~ms GPU / $1.20$~ms CPU (Model A),
@@ -593,6 +691,53 @@ in the accuracy memory compute space the target hardware sits}:
   \item There is no universally "better" choice among the three models;
   the right one depends entirely on the deployment target's memory budget
   and the accuracy requirement of the application.
+\end{itemize}
+
+\section{Limitations and Threats to Validity}
+\label{sec:limitations}
+
+\begin{itemize}
+  \item \textbf{Single run per configuration.} Each model/optimizer
+  combination was trained once with a fixed seed (42). The $0.98$
+  percentage point gap between Model A and Model B, and the $0.22$ point
+  gap between MobileNetV2 and EfficientNet-B0, are within the range that a
+  different random initialization could plausibly change; no confidence
+  intervals or repeated-seed statistics were computed.
+  \item \textbf{Inconsistent hardware for the optimizer sweep.} The Model A
+  optimizer sweep (Section~\ref{sec:optimizer}, Table~\ref{tab:model-a-sweep})
+  was run on local CPU hardware before the project migrated to a Kaggle
+  Tesla T4 GPU for all other reported numbers. Its qualitative conclusion
+  (SGD with momentum closes most of the gap to Adam) is corroborated by the
+  full-length, Tesla T4 Model B run in Table~\ref{tab:model-b-optimizer},
+  but the absolute numbers in that one table are not on the same hardware
+  basis as the rest of the report.
+  \item \textbf{Limited SOTA hyperparameter search.} Both pretrained models
+  were fine-tuned with a single fixed recipe (Adam, $\text{lr}=10^{-4}$, 5
+  epochs) rather than a tuned schedule; a learning-rate sweep or more epochs
+  might change the ranking between MobileNetV2 and EfficientNet-B0.
+  \item \textbf{Synthetic, untrained-model benchmarks.} The MAC/FLOP and
+  latency figures in Table~\ref{tab:final-comparison} and
+  Section~\ref{sec:final-comparison} are measured on newly initialized
+  models with synthetic inputs, not the trained checkpoints, and exclude
+  normalization/activation/pooling overhead. They are not physical
+  edge-device measurements and should be treated as indicative only.
+  \item \textbf{No quantized or on-device evaluation.} TorchScript and ONNX
+  export were verified for numerical parity with the PyTorch checkpoints,
+  but no INT8 quantization or actual microcontroller/edge-board latency
+  measurement was performed; the "fits on a microcontroller" claims for
+  Model B (Section~\ref{sec:final-comparison}) are based on checkpoint size
+  and the activation-memory estimate above, not a measured deployment.
+  \item \textbf{Dataset realism.} EuroSAT is a curated, largely cloud-free
+  Sentinel-2 benchmark; a real edge sensor (e.g.\ an onboard satellite or
+  drone camera) would additionally face atmospheric effects, sensor noise,
+  and viewing-angle variation not represented here, so reported accuracies
+  should be read as an upper bound relative to a genuinely deployed system.
+  \item \textbf{Persistent class confusions.} Even the best-performing
+  fine-tuned models do not fully resolve the Highway/River and
+  HerbaceousVegetation/PermanentCrop confusions identified in
+  Section~\ref{sec:custom-training}; this appears to be a
+  resolution/dataset limit rather than something further training of these
+  particular architectures would fix.
 \end{itemize}
 
 \section{Conclusion}
