@@ -9,7 +9,20 @@
 \usepackage{xcolor}
 \usepackage{hyperref}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta, positioning}
+\usetikzlibrary{arrows.meta,positioning}
+
+\definecolor{diagramblue}{HTML}{1F4E79}
+\definecolor{diagramlight}{HTML}{EAF2F8}
+\definecolor{diagramgray}{HTML}{F2F4F4}
+\tikzset{
+  diagram node/.style={draw=diagramblue, rounded corners=2pt,
+    fill=diagramlight, text width=2.15cm, minimum height=0.78cm,
+    align=center, font=\small},
+  diagram process/.style={draw=black!45, rounded corners=2pt,
+    fill=diagramgray, text width=2.15cm, minimum height=0.78cm,
+    align=center, font=\small},
+  diagram arrow/.style={-{Latex[length=2mm]}, draw=black!65, line width=0.7pt}
+}
 
 \hypersetup{
   pdftitle={EN3150 Assignment 03 - Resource-Constrained CNN for Edge Image Classification},
@@ -26,20 +39,133 @@
 \date{\today}
 
 \begin{document}
-\maketitle
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+\vspace*{1.5cm}
+
+{\Large\textsc{EN3150 Assignment 03}\par}
+\vspace{1.2cm}
+{\Huge\bfseries Resource Constrained CNN\par}
+\vspace{0.25cm}
+{\Huge\bfseries for Edge Image Classification\par}
+\vspace{1.4cm}
+
+{\large\textcolor{diagramblue}{EuroSAT land use classification study}\par}
+\vfill
+
+\begin{table}[H]
+\centering
+\caption*{\large\textbf{Group members}}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabular}{|p{1.65in}|c|p{3.15in}|}
+\hline
+\textbf{Name} & \textbf{Index number} & \textbf{Contribution} \\
+\hline
+S.E.N. Silva & 230615V & Model design and experimentation \\
+\hline
+R.P.M. Vithanage & 230674A & Training and evaluation pipeline \\
+\hline
+S.V.C.H. Vithanage & 230675D & Analysis and report preparation \\
+\hline
+\end{tabular}
+\end{table}
+
+\vspace{1cm}
+\begin{tabular}{rl}
+\textbf{Course:} & EN3150 \\
+\textbf{Dataset:} & EuroSAT RGB \\
+\textbf{Repository:} &
+\url{github.com/rash200319/CNN-for-image-classification} \\
+\textbf{Date:} & \today
+\end{tabular}
+
+\vfill
+{\small Department of Computer Engineering\par}
+\end{titlepage}
+
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
 
 \section{Data Preparation}
 
 \subsection{Dataset}
 This work uses the RGB variant of the \textbf{EuroSAT} land use/land cover
 dataset, which consists of 27{,}000 Sentinel 2 satellite image patches of
-size $64 \times 64$ pixels across 10 balanced ish classes: AnnualCrop,
-Forest, HerbaceousVegetation, Highway, Industrial, Pasture, PermanentCrop,
-Residential, River, and SeaLake. Because the images are already at
+size $64 \times 64$ pixels across 10 approximately balanced classes:
+AnnualCrop, Forest, HerbaceousVegetation, Highway, Industrial, Pasture,
+PermanentCrop, Residential, River, and SeaLake. Because the images are already at
 $64\times64$ resolution, no downscaling was required to satisfy the
 assignment's maximum resolution constraint; both custom models and both
 pretrained SOTA models are trained and evaluated at $64\times64$ to strictly
 comply with the assignment's maximum resolution requirement.
+
+\begin{figure}[H]
+\centering
+\renewcommand{\arraystretch}{0.9}
+\begin{tabular}{ccccc}
+\includegraphics[width=0.17\textwidth]{figures/eurosat_AnnualCrop.jpg} &
+\includegraphics[width=0.17\textwidth]{figures/eurosat_Forest.jpg} &
+\includegraphics[width=0.17\textwidth]{figures/eurosat_HerbaceousVegetation.jpg} &
+\includegraphics[width=0.17\textwidth]{figures/eurosat_Highway.jpg} &
+\includegraphics[width=0.17\textwidth]{figures/eurosat_Industrial.jpg} \\
+\scriptsize AnnualCrop & \scriptsize Forest &
+\scriptsize Herbaceous vegetation & \scriptsize Highway &
+\scriptsize Industrial \\[0.6em]
+\includegraphics[width=0.17\textwidth]{figures/eurosat_Pasture.jpg} &
+\includegraphics[width=0.17\textwidth]{figures/eurosat_PermanentCrop.jpg} &
+\includegraphics[width=0.17\textwidth]{figures/eurosat_Residential.jpg} &
+\includegraphics[width=0.17\textwidth]{figures/eurosat_River.jpg} &
+\includegraphics[width=0.17\textwidth]{figures/eurosat_SeaLake.jpg} \\
+\scriptsize Pasture & \scriptsize Permanent crop &
+\scriptsize Residential & \scriptsize River & \scriptsize Sea/lake
+\end{tabular}
+\caption{One representative RGB image from each EuroSAT class. The labels
+identify the target class; the examples are intended to illustrate the
+visual cues available to the classifier rather than define the classes
+exhaustively.}
+\label{fig:eurosat-class-overview}
+\end{figure}
+
+The classes are separated mainly by spatial arrangement, texture, colour,
+and the presence of human-made structures. The most useful visual cues and
+common sources of confusion are summarized in Table~\ref{tab:class-cues}.
+
+\begin{table}[H]
+\centering
+\caption{Distinctive visual cues and likely confusions between EuroSAT
+classes.}
+\label{tab:class-cues}
+\small
+\renewcommand{\arraystretch}{1.18}
+\begin{tabular}{|p{1.35in}|p{2.55in}|p{2.25in}|}
+\hline
+\textbf{Class} & \textbf{Distinctive separable cues} & \textbf{Likely confusion} \\
+\hline
+AnnualCrop & Large, regular cultivated fields with seasonal bare-soil or crop patterns. & PermanentCrop; Pasture \\
+\hline
+Forest & Dense, continuous tree canopy with fine, irregular texture. & HerbaceousVegetation; Pasture \\
+\hline
+HerbaceousVegetation & Open green cover with coarse, irregular natural texture and few field boundaries. & Forest; Pasture \\
+\hline
+Highway & Long, narrow linear road surfaces, junctions, and surrounding verges. & River; Residential \\
+\hline
+Industrial & Large bright roofs, warehouses, paved yards, and rectilinear layouts. & Residential; Highway \\
+\hline
+Pasture & Open grassland with relatively uniform green cover and fewer crop boundaries. & HerbaceousVegetation; AnnualCrop \\
+\hline
+PermanentCrop & Repeated orchard or plantation rows with regular spacing. & AnnualCrop; Forest \\
+\hline
+Residential & Dense clusters of buildings, roads, and small fragmented plots. & Industrial; Highway \\
+\hline
+River & Winding, narrow water corridor with visible banks and surrounding vegetation. & Highway; Sea/lake \\
+\hline
+SeaLake & Broad, contiguous water body with large smooth dark or blue regions. & River \\
+\hline
+\end{tabular}
+\end{table}
 
 \subsection{Train / Validation / Test split}
 The dataset was split \textbf{70\% / 15\% / 15\%} into training, validation,
@@ -103,18 +229,85 @@ described above, from raw images to model-ready batches.
 \label{fig:data-pipeline}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.25cm and 0.35cm]
+  \node[diagram node] (data) {EuroSAT RGB\\27,000 images};
+  \node[diagram process, right=of data] (split) {Stratified split\\70 / 15 / 15};
+  \node[diagram process, right=of split] (prep) {Resize and\\normalize};
+  \node[diagram process, right=of prep] (aug) {Train only:\\random flips};
+  \node[diagram node, right=of aug] (models) {CNNs and\\pretrained models};
+  \node[diagram process, right=of models] (eval) {Metrics, plots\\and exports};
+  \draw[diagram arrow] (data) -- (split);
+  \draw[diagram arrow] (split) -- (prep);
+  \draw[diagram arrow] (prep) -- (aug);
+  \draw[diagram arrow] (aug) -- (models);
+  \draw[diagram arrow] (models) -- (eval);
+\end{tikzpicture}}
+\caption{End-to-end experimental pipeline. Augmentation is applied only to
+the training split; validation and test images remain deterministic.}
+\label{fig:experimental-pipeline}
+\end{figure}
+
 \section{Custom Architecture Design}
 \label{sec:custom-models}
 
 Both custom models follow the standard CNN pipeline:
 \texttt{[Conv + ReLU] → Pool → [Conv + ReLU] → Pool → ... → Classifier →
 Softmax}, taking a $3 \times 64 \times 64$ RGB input and producing a
-10-class prediction.
+10-class prediction. The shared data and evaluation flow is summarized in
+Figure~\ref{fig:experimental-pipeline}.
+
+\begin{figure}[H]
+\centering
+\resizebox{0.88\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.42cm and 0.9cm]
+  \node[diagram node] (input) {Shared input\\$3\times64\times64$};
+  \node[diagram process, right=2.15cm of input] (a)
+    {Model A\\standard CNN\\549,290 parameters};
+  \node[diagram process, below=0.72cm of a] (b)
+    {Model B\\depthwise-separable CNN\\13,288 parameters};
+  \node[diagram node, right=2.15cm of a] (output) {10-class\\prediction};
+  \draw[diagram arrow] (input.east) -- (a.west);
+  \draw[diagram arrow] (input.east) -- (b.west);
+  \draw[diagram arrow] (a.east) -- (output.west);
+  \draw[diagram arrow] (b.east) -- (output.west);
+\end{tikzpicture}}
+\caption{Custom architecture design overview. Both models use the same
+$64\times64$ RGB input and ten-class output, but differ in their feature
+extraction and classifier design.}
+\label{fig:custom-architecture-overview}
+\end{figure}
 
 \subsection{Model A: Standard CNN}
 
 Model A interleaves regular 2D convolutions with max-pooling layers,
-followed by a flatten and two fully-connected layers.
+followed by a flatten and two fully-connected layers, as shown in
+Figure~\ref{fig:model-a-pipeline}.
+
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.25cm and 0.3cm]
+  \node[diagram node] (input) {Input\\$3\times64\times64$};
+  \node[diagram process, right=of input] (c1) {Conv $3\to16$\\ReLU + pool};
+  \node[diagram process, right=of c1] (c2) {Conv $16\to32$\\ReLU + pool};
+  \node[diagram process, right=of c2] (c3) {Conv $32\to64$\\ReLU + pool};
+  \node[diagram process, right=of c3] (flat) {Flatten\\$4096$};
+  \node[diagram process, right=of flat] (fc) {Linear\\$4096\to128$};
+  \node[diagram node, right=of fc] (out) {Output\\10 classes};
+  \draw[diagram arrow] (input) -- (c1);
+  \draw[diagram arrow] (c1) -- (c2);
+  \draw[diagram arrow] (c2) -- (c3);
+  \draw[diagram arrow] (c3) -- (flat);
+  \draw[diagram arrow] (flat) -- (fc);
+  \draw[diagram arrow] (fc) -- (out);
+\end{tikzpicture}}
+\caption{Model A forward path. Three standard convolution stages are followed
+by a parameter-heavy flattened classifier head.}
+\label{fig:model-a-pipeline}
+\end{figure}
 
 \begin{table}[H]
 \centering
@@ -138,7 +331,7 @@ Linear & $128 \rightarrow 10$ & $10$ \\
 \end{tabular}
 \end{table}
 
-\paragraph{Hand-calculated parameter count.} For a standard Conv2D layer the
+\paragraph{Calculated parameter count.} For a standard Conv2D layer the
 trainable parameter count is $C_{out} \cdot C_{in} \cdot K^2 + C_{out}$ (the
 $+C_{out}$ term is the bias), and for a Linear layer it is
 $\text{in} \cdot \text{out} + \text{out}$.
@@ -171,7 +364,7 @@ of a large flatten + FC head). The hand-calculated total of 549{,}290 was
 cross checked against a runtime parameter count
 (\texttt{sum(p.numel() for p in model.parameters())}) and matches exactly.
 
-\subsection{Model B: Lightweight depthwise-separable CNN}
+\subsection{Model B: Lightweight depthwise separable CNN}
 
 Model B replaces every standard convolution with a \textbf{depthwise
 separable convolution}: a depthwise $K \times K$ convolution applied
@@ -184,6 +377,30 @@ typical layer widths) relative to a full standard convolution of the same
 shape. Each depthwise separable block is followed by batch normalization and
 ReLU. The classifier head uses global average pooling (GAP) instead of a
 flatten, which is the main reason Model B's parameter count stays small.
+The resulting forward path is shown in Figure~\ref{fig:model-b-pipeline}.
+
+\begin{figure}[H]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[node distance=0.25cm and 0.3cm]
+  \node[diagram node] (input) {Input\\$3\times64\times64$};
+  \node[diagram process, right=of input] (b1) {DW $3\times3$\\PW $3\to32$\\BN + ReLU + pool};
+  \node[diagram process, right=of b1] (b2) {DW $3\times3$\\PW $32\to64$\\BN + ReLU + pool};
+  \node[diagram process, right=of b2] (b3) {DW $3\times3$\\PW $64\to128$\\BN + ReLU + pool};
+  \node[diagram process, right=of b3] (gap) {Global average\\pooling};
+  \node[diagram node, right=of gap] (out) {Output\\10 classes};
+  \draw[diagram arrow] (input) -- (b1);
+  \draw[diagram arrow] (b1) -- (b2);
+  \draw[diagram arrow] (b2) -- (b3);
+  \draw[diagram arrow] (b3) -- (gap);
+  \draw[diagram arrow] (gap) -- (out);
+\end{tikzpicture}}
+\caption{Model B forward path. Each depthwise-separable stage combines
+depthwise convolution, pointwise channel mixing and batch normalization;
+the pooling layers follow each stage, and global average pooling avoids a
+large flatten layer.}
+\label{fig:model-b-pipeline}
+\end{figure}
 
 \begin{table}[H]
 \centering
@@ -206,7 +423,7 @@ Linear & $128 \rightarrow 10$ & $10$ \\
 \end{tabular}
 \end{table}
 
-\paragraph{Hand-calculated parameter count.} A depthwise conv (groups $=
+\paragraph{Calculated parameter count.} A depthwise conv (groups $=
 C_{in}$, one filter per channel) costs $C_{in} \cdot K^2 + C_{in}$; a
 pointwise $1\times1$ conv costs $C_{in} \cdot C_{out} + C_{out}$; and a
 BatchNorm2D layer contributes $2C$ learnable parameters (scale $\gamma$ and
@@ -242,7 +459,7 @@ using only $13.3\%$ of it ($86.7\%$ headroom). This headroom is a deliberate
 consequence of the GAP based head rather than an accident: a flatten of the
 final $8\times8\times128$ feature map into even a modestly sized FC layer
 would alone cost well over $100{,}000$ parameters, so GAP was essential to
-the design, not an afterthought. The hand-calculated total was likewise
+the design, not an afterthought. The hand calculated total was likewise
 cross checked against a runtime parameter count and matches exactly.
 
 \subsection{Activation function justification}
@@ -279,7 +496,7 @@ CPU only compute budget available for this assignment.
 
 Two independent experiments were run to justify this choice.
 
-\paragraph{Model A, 10-epoch sweep.} Adam ($\text{lr}=10^{-3}$), plain SGD
+\paragraph{Model A, 10 epoch sweep.} Adam ($\text{lr}=10^{-3}$), plain SGD
 ($\text{lr}=10^{-2}$), and SGD with momentum ($\text{lr}=10^{-2}$,
 $\text{momentum}=0.9$) were each trained for 10 epochs. SGD and SGD+momentum
 were given the same (larger) learning rate since, without adaptive scaling,
@@ -391,6 +608,50 @@ copied by hand.
 \label{fig:training-pipeline}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\resizebox{0.92\textwidth}{!}{%
+\begin{tikzpicture}[
+  node distance=7mm and 10mm,
+  box/.style={draw, rounded corners, align=center, font=\small,
+    minimum height=8mm, inner sep=4pt},
+  wide/.style={box, minimum width=7.6cm},
+  narrow/.style={box, minimum width=5.6cm},
+  arr/.style={-{Stealth[length=2.2mm]}}
+]
+\node[wide] (train) {\texttt{train.py}: model, optimizer, learning rate, epochs};
+\node[wide, below=of train] (ckpt)
+  {\texttt{best\_model.pt} (checkpoint) + \texttt{history.csv}
+  (per-epoch train/validation loss, accuracy, time)};
+\node[narrow, below=14mm of ckpt, xshift=-3.3cm] (eval)
+  {\texttt{evaluate.py} on test set};
+\node[narrow, below=14mm of ckpt, xshift=3.3cm] (plot)
+  {\texttt{plot\_history.py}};
+\node[narrow, below=of eval] (evalout)
+  {\texttt{metrics.json} + \texttt{confusion\_matrix.png}};
+\node[narrow, below=of plot] (plotout)
+  {\texttt{loss\_curve.png}};
+\node[wide, below=16mm of evalout, xshift=1.65cm] (compare)
+  {\texttt{compare\_runs.py}: aggregates \texttt{metrics.json} +
+  \texttt{history.csv} across runs};
+\node[wide, below=of compare] (table)
+  {\texttt{comparison\_table.csv} $\rightarrow$ report tables and figures};
+
+\draw[arr] (train) -- (ckpt);
+\draw[arr] (ckpt) -- (eval);
+\draw[arr] (ckpt) -- (plot);
+\draw[arr] (eval) -- (evalout);
+\draw[arr] (plot) -- (plotout);
+\draw[arr] (evalout) -- (compare);
+\draw[arr] (plotout) -- (compare);
+\draw[arr] (compare) -- (table);
+\end{tikzpicture}%
+}
+\caption{Training, evaluation, and comparison pipeline shared by the four
+reported models.}
+\label{fig:training-pipeline}
+\end{figure}
+
 \subsection{Loss curves}
 
 \begin{figure}[H]
@@ -421,7 +682,7 @@ because its batch normalization layers and global average pooling head
 provide effective structural regularization while leaving far fewer
 parameters available to overfit.
 
-\subsection{Confusion matrices and per-class metrics}
+\subsection{Confusion matrices and per class metrics}
 
 \begin{figure}[H]
 \centering
@@ -495,7 +756,7 @@ parameters and produces a checkpoint roughly $34\times$ smaller
 by $0.98$ percentage points ($91.01\%$ vs.\ $90.03\%$) on the test set. This is
 a striking result for the depthwise separable design: by replacing the dense
 $524{,}416$ parameter flatten+FC1 head with global average pooling and adding
-batch normalization to each depthwise-separable stage, Model B eliminates the
+batch normalization to each depthwise separable stage, Model B eliminates the
 overfitting bottleneck of Model A while cutting the memory footprint by $97.0\%$.
 
 When comparing wall clock training speed on the GPU, Model B's median epoch time
