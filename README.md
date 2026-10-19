@@ -189,6 +189,50 @@ Linear(128 -> 10)
 | `A` | `outputs/final_a_adam/best_model.pt` | `3x64x64` | 549,290 | 2150.1 | 2171.7 | `0.00e+00` | 19.4 | `7.63e-06` |
 | `B` | `outputs/modelb_adam/best_model.pt` | `3x64x64` | 13,288 | 63.9 | 92.6 | `0.00e+00` | 26.7 | `9.16e-05` |
 
+## Step-by-Step Reproducibility Guide
+
+Follow these steps to verify and run the project from a clean machine outside the development environment:
+
+1. **Clone into a Clean Directory & Create an Isolated Environment**
+   - Clone the repository and create a fresh virtual environment (`python -m venv .venv`).
+   - Install pinned dependencies:
+     ```bash
+     pip install -r requirements.txt
+     ```
+
+2. **Verify Automated Unit Tests & CI Pipeline (No Dataset Required)**
+   - Run the offline unit test suite to verify model architectures, parameter limits (`< 100,000` for Model B), MAC/FLOP profilers, inference, and exporters:
+     ```bash
+     python -m unittest discover -s tests -v
+     ```
+   - Automated CI verification is also configured in `.github/workflows/ci.yml` for clean Ubuntu runners (Python 3.11 & 3.12).
+
+3. **Verify Dataset Placement & Integrity**
+   - Place the EuroSAT RGB dataset at `archive/EuroSAT` (or pass `--data-dir` to CLI scripts).
+   - Run the dataset verification and resolution audit scripts to confirm all 27,000 images (`64 x 64`) and deterministic stratified splits (`SEED = 42`) match `docs/DATASET.md`:
+     ```bash
+     python -m src.data.verify_dataset --export-md docs/DATASET.md
+     python tests/test_dataset_resolution.py --dataset-dir archive/EuroSAT
+     ```
+
+4. **Run Pre-Trained Checkpoints Immediately (Zero-Training Verification)**
+   - Evaluate saved checkpoints (`outputs/*/best_model.pt`) and run single-image inference directly without retraining:
+     ```bash
+     python -m src.evaluate --model b --checkpoint outputs/modelb_adam/best_model.pt --img-size 64
+     python -m src.predict --model b --checkpoint outputs/modelb_adam/best_model.pt --image archive/EuroSAT/Forest/Forest_1.jpg
+     ```
+
+5. **Run Hardware-Independent Benchmarks & Edge Exports**
+   - Reproduce MACs, FLOPs, latency profiles, and verified TorchScript/ONNX edge deployment artifacts:
+     ```bash
+     python -m src.benchmark --device cpu --runs 100 --out outputs/benchmark_cpu.csv
+     python -m src.export --model b --checkpoint outputs/modelb_adam/best_model.pt
+     ```
+
+6. **Reproduce Full Training via CLI or Cloud Notebook**
+   - **Local CLI**: Execute the training commands below with deterministic seeding (`--seed 42`) and aggregate results using `python -m src.compare_runs`.
+   - **Cloud (One-Click)**: Open `notebooks/EN3150_A03_kaggle_colab.ipynb` in Kaggle or Google Colab to run the full end-to-end pipeline in the cloud without local setup.
+
 ## Commands
 
 Install dependencies:
@@ -232,3 +276,4 @@ python -m src.data.verify_dataset --export-md docs/DATASET.md
 python tests/test_dataset_resolution.py --dataset-dir archive/EuroSAT
 python -m unittest discover -s tests -v
 ```
+
